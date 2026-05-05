@@ -7,8 +7,8 @@ CollectorCtrl is a professional, high-performance management server for **OpenTe
 - **Fleet Management**: Centralized overview of all connected OpAMP agents and their supervisors.
 - **Remote Configuration**: Push, roll back, and manage collector configurations at scale.
 - **Health & Monitoring**: Real-time health reporting and connectivity status for the entire fleet.
-- **Package Management**: Remote upgrades and custom package distribution for OTEL collectors.
-- **Windows Service Ready**: Natively runs as a Windows Service for production stability.
+- **Windows-Native Supervisor**: A specialized agent manager designed specifically for Windows Server environments.
+- **Windows Service Ready**: Both the Server and Supervisor natively run as Windows Services for production stability.
 - **Unified Deployment**: The Go backend serves the frontend assets directly—no Node.js needed in production.
 
 ## Architecture

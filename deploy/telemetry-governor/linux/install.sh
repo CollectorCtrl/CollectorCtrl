@@ -29,6 +29,8 @@ services:
       - "8123:8123"
     environment:
       - CLICKHOUSE_DB=telemetry_governor
+      - CLICKHOUSE_PASSWORD=telemetrypassword
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
     volumes:
       - clickhouse-data:/var/lib/clickhouse
     ulimits:
@@ -72,6 +74,8 @@ processors:
 exporters:
   clickhouse:
     endpoint: tcp://clickhouse:9000?database=telemetry_governor
+    username: default
+    password: telemetrypassword
     create_schema: true
     ttl: 24h
 
@@ -145,7 +149,7 @@ fi
 
 # 4. Wait for ClickHouse database server to become healthy
 echo "Waiting for ClickHouse server to accept connections..."
-until docker exec telemetry-governor-clickhouse clickhouse-client --query "SELECT 1" &>/dev/null; do
+until docker exec telemetry-governor-clickhouse clickhouse-client --password telemetrypassword --query "SELECT 1" &>/dev/null; do
   printf "."
   sleep 2
 done
@@ -153,7 +157,7 @@ echo " ClickHouse is online!"
 
 # 5. Apply ClickHouse database schema manually
 echo "Applying database schema..."
-docker exec -i telemetry-governor-clickhouse clickhouse-client < schema.sql
+docker exec -i telemetry-governor-clickhouse clickhouse-client --password telemetrypassword < schema.sql
 
 echo "=================================================="
 echo "Telemetry Governor Engine is now ready!"

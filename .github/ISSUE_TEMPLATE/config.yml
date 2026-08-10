@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Documentation
+    url: https://collectorctrl.com/docs
+    about: Full documentation suite — installation guides, fleet operations, and troubleshooting.
+  - name: 🔒 Security Vulnerability
+    url: https://github.com/CollectorCtrl/CollectorCtrl/blob/main/SECURITY.md
+    about: Please do NOT report vulnerabilities via public issues — see our Security Policy.
+  - name: 💬 General Questions
+    url: https://collectorctrl.com
+    about: For general inquiries, reach out via collectorctrl.com.

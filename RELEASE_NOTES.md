@@ -1,41 +1,59 @@
-# CollectorCtrl Beta v0.2.0 Release Notes
+# CollectorCtrl 1.1.x Release Notes
 
-We are thrilled to announce the release of **CollectorCtrl Beta v0.2.0**, the next major milestone in our journey toward definitive OpenTelemetry fleet control and governance.
-
-This release transitions CollectorCtrl from a Windows-centric preview into a robust, cross-platform, enterprise-ready control plane. Version 0.2.0 introduces Linux support, PostgreSQL compatibility for enterprise-scale deployments, OpenID Connect (OIDC) Single Sign-On, real-time SIEM audit streaming, and the new agent-side Drift Guardian.
+CollectorCtrl 1.1.x is the current stable release line of the cross-platform OpenTelemetry fleet control plane. This document summarizes the current state of the platform — including the latest installer and protocol-default changes — and consolidates the major capabilities delivered since the early betas.
 
 ---
 
-## What's New in Beta v0.2.0
+## Latest Updates (1.1.x)
 
-### 🐧 1. Linux Support (Server & Agent)
-CollectorCtrl is now fully cross-platform. We have expanded our management capabilities and background services to support enterprise Linux distributions.
-- **Server Deployment**: Extract and run with our automated `install.sh` script, which configures PostgreSQL dependencies, database schemas, and systemd services.
-- **Supervisor systemd Daemon**: Register the Supervisor Agent as a systemd service (`collectorctrl-supervisor.service`) with standard process recovery options.
-- **Hot-Reload Mechanics**: On Linux, the Supervisor triggers configuration updates using the POSIX `SIGHUP` signal to reload the OTel Collector process in place with zero downtime.
+### 🌐 Unified HTTP-First Defaults (Windows & Linux)
 
-### 🐘 2. PostgreSQL Enterprise Store
-To support massive scale, we have added a dual-storage database layer.
-- **SQLite** remains the default for local development, fast testing, and single-instance proofs-of-concept.
-- **PostgreSQL** is now supported as a production-grade database store. The schema features zero-downtime auto-migrations and scales to manage **10,000+ concurrent agents** across multi-region networks.
+The default protocol behavior is now consistent across platforms, removing the most common first-run friction:
 
-### 🔐 3. OIDC Identity & Single Sign-On (SSO)
-Secure access to the Admin UI using your existing identity provider (IdP).
-- **Federated Authentication**: Direct integration with Azure AD, Okta, and Auth0 via the OpenID Connect (OIDC) protocol.
-- **Just-in-Time (JIT) Provisioning**: User profiles are dynamically created upon successful identity provider login.
-- **Dynamic Group Mappings**: Automatically assign roles (`Admin`, `Operator`, or `Viewer`) based on directory group memberships.
+- **Web Console**: Served over plain **HTTP** at `http://localhost:4321` (or `http://<server-ip>:4321`). Browsers that auto-upgrade to `https://` will fail to connect — use `http://`.
+- **OpAMP Endpoint**: Supervisors connect over **`ws://<server-ip>:4320/v1/opamp`** by default. `wss://` is used when TLS is configured.
+- **Production TLS**: HTTPS can be enabled via a reverse proxy (IIS / Nginx / Caddy, recommended) or natively with the `COLLECTORCTRL_UI_HTTPS`, `COLLECTORCTRL_UI_ADDR`, `COLLECTORCTRL_UI_CERT`, and `COLLECTORCTRL_UI_KEY` environment variables. See the [Setup Guide](docs/setup.md#4-production-https).
 
-### 📊 4. SIEM OTLP Audit Streaming
-Maintain compliance easily with our native, real-time audit logging engine.
-- **OTLP Event Streaming**: Every administrator action, user login/logout, configuration update, and API token generation is emitted in real time as structured OTLP log events.
-- **Native SIEM Integration**: Forward audit trails directly to Splunk, Elastic, Datadog, or any OTLP-compatible security backend.
-- **Compliance Ready**: Helps satisfy audit log requirements for SOC 2 Type II and other regulatory frameworks.
+### 🪟 Windows Installer Improvements
 
-### 🛡️ 5. Local Drift Guardian & Integrity
-Keep your collection edge clean of configuration sprawl and unauthorized alterations.
-- **Local Drift Guardian**: The Supervisor Agent runs an active on-disk file checksum watcher.
-- **Self-Healing Configs**: Any unauthorized manual edits to the managed `config.yaml` file on an agent node are instantly overwritten by the Supervisor with the server's authorized snapshot.
-- **Visual Sync Status**: Track sync states (`In sync`, `Reconciling`, or `Drifted`) in real time from the central Admin UI.
+- The interactive `.exe` setup wizard registers and starts the **`CollectorCtrl`** Windows Service automatically.
+- Two editions: **Standard (SQLite)** and **PostgreSQL** — the PostgreSQL wizard collects host, port, user, and password during setup.
+- On completion, the installer launches the Web Console in your default browser at `http://localhost:4321`.
+
+### 🐧 Linux Installer Improvements
+
+- A **single-command automated installer** (`sudo ./install.sh`) for Ubuntu, Debian, RHEL, CentOS, and Amazon Linux 2023:
+  - Detects the package manager (`apt-get` / `yum` / `dnf`).
+  - Installs PostgreSQL (PostgreSQL edition), creates the `collectorctrl` database and user, and auto-configures `pg_hba.conf` for local authentication (`scram-sha-256`).
+  - Writes the database connection string into the systemd unit and installs the service at `/etc/systemd/system/collectorctrl.service`.
+- **Interactive Supervisor installer**: prompts for the Management Server endpoint (default `ws://localhost:4320/v1/opamp`), writes `supervisor.yaml`, and registers the `collectorctrl-supervisor` systemd service.
+
+### 🐳 Docker Distribution
+
+Official server images are published to GitHub Container Registry:
+
+```bash
+docker run -d \
+  --name collectorctrl \
+  --restart always \
+  -p 4320:4320 \
+  -p 4321:4321 \
+  -v collectorctrl-data:/opt/collectorctrl \
+  ghcr.io/collectorctrl/collectorctrl-server:latest
+```
+
+---
+
+## Platform Capabilities (Cumulative)
+
+- **Fleet Management**: Centralized, real-time overview of all connected OpAMP agents across Windows, Linux, and Kubernetes.
+- **Remote Configuration**: Policy-driven configuration with Kubernetes-style label selectors, SHA-versioned snapshots, canary rollouts, and one-click rollback.
+- **Drift Prevention**: The server continuously compares each agent's reported effective configuration against the governed policy. A configurable **DriftPolicy** (`alert_only` or `auto_remediate`) flags or automatically corrects any divergence.
+- **Remote Supervisor Upgrades**: Fleet-wide Supervisor self-upgrade orchestration with self-healing rollback protection.
+- **PostgreSQL Enterprise Store**: Dual-storage engine — SQLite for development, PostgreSQL for production (10,000+ concurrent agents) with zero-downtime auto-migrations.
+- **OIDC Single Sign-On**: Microsoft Entra ID (Azure AD), Okta, Auth0 — with JIT provisioning and group-to-role mapping (Admin, Editor, Viewer, and custom RBAC roles).
+- **SIEM OTLP Audit Streaming**: Every administrator action streamed in real time as structured OTLP log events to Splunk, Elastic, Datadog, or any OTLP-compatible backend.
+- **Kubernetes Fleet Management**: Manage collectors running in Kubernetes clusters (Helm charts provided).
 
 ---
 
@@ -43,46 +61,54 @@ Keep your collection edge clean of configuration sprawl and unauthorized alterat
 
 | Port | Protocol | Direction | Component / Purpose |
 | :--- | :--- | :--- | :--- |
-| **4320** | TCP / WSS | Inbound to Server | **OpAMP Gateway** (Control plane communications) |
-| **4321** | TCP / HTTPS | Inbound to Server | **Dashboard Console** & REST API |
-| **13133** | TCP | Localhost only | **OTel Health Check** (Local agent monitoring) |
-| **5432** | TCP | Outbound from Server | **PostgreSQL Store** (Database connection) |
+| **4320** | TCP / WS (WSS with TLS) | Inbound to Server | **OpAMP Gateway** (control plane communications) |
+| **4321** | TCP / HTTP (HTTPS with TLS) | Inbound to Server | **Dashboard Console** & REST API |
+| **13133** | TCP | Localhost only | **OTel Health Check** (local agent monitoring) |
+| **5432** | TCP | Localhost / Outbound | **PostgreSQL Store** (database connection) |
+
+> Supervisors connect **outbound** to the server on port 4320 — no inbound ports are required on agent machines.
 
 ---
 
-## Upgrade & Installation Guide
+## Upgrade Guide
 
 ### Upgrading the Server
+
 1. Stop the active service:
-   - **Windows**: `Stop-Service -Name "CollectorCtrlServer"`
-   - **Linux**: `sudo systemctl stop collectorctrl.service`
+   - **Windows**: `Stop-Service -Name "CollectorCtrl"`
+   - **Linux**: `sudo systemctl stop collectorctrl`
 2. Apply the new executable or extraction package.
-3. Start the service. Auto-migrations will apply database updates automatically:
-   - **Windows**: `Start-Service -Name "CollectorCtrlServer"`
-   - **Linux**: `sudo systemctl start collectorctrl.service`
+3. Start the service — database auto-migrations apply automatically:
+   - **Windows**: `Start-Service -Name "CollectorCtrl"`
+   - **Linux**: `sudo systemctl start collectorctrl`
 
 ### Upgrading the Supervisor Agent
-1. Replace the supervisor binary on client nodes.
-2. For Windows, you can optionally perform manual service registration using the new PowerShell script:
-   ```powershell
-   New-Service -Name "CollectorCtrlSupervisor" `
-               -BinaryPathName '"C:\Program Files\CollectorCtrl\CollectorCtrlSupervisor.exe" -config "C:\Program Files\CollectorCtrl\supervisor.conf"' `
-               -DisplayName "CollectorCtrl Supervisor" `
-               -StartupType Automatic
-   Start-Service -Name "CollectorCtrlSupervisor"
-   ```
-3. For Linux, verify that your `/etc/collectorctrl/supervisor.yaml` matches the new configuration schema, then restart the daemon:
-   ```bash
-   sudo systemctl restart collectorctrl-supervisor.service
-   ```
+
+Supervisor upgrades can be pushed **remotely from the Admin UI** (Package Management → Fleet Upgrade), with automatic rollback on failure.
+
+For manual upgrades on client nodes:
+
+```powershell
+# Windows (Admin PowerShell)
+New-Service -Name "CollectorCtrlSupervisor" `
+            -BinaryPathName '"C:\Program Files\CollectorCtrl Supervisor\supervisor.exe" --config "C:\Program Files\CollectorCtrl Supervisor\supervisor.yaml"' `
+            -DisplayName "CollectorCtrl Supervisor" `
+            -StartupType Automatic
+Start-Service -Name "CollectorCtrlSupervisor"
+```
+
+```bash
+# Linux
+sudo systemctl restart collectorctrl-supervisor
+```
 
 ---
 
 ## Looking Ahead
-This beta release brings us one step closer to our production-ready **v1.0 release scheduled for Q4 2026**. Upcoming highlights include:
-- Granular custom RBAC permissions definition.
-- Native Kubernetes Operator integration.
-- Expanded package management and custom collector builders.
+
+- Expanded package management and custom collector builder capabilities.
+- Deeper Kubernetes operator integration.
+- Continued hardening toward the next production milestone.
 
 ---
 *© 2026 CollectorCtrl. All rights reserved. For issues or questions, contact us at connect@collectorctrl.com.*

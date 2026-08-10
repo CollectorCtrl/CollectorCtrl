@@ -8,11 +8,11 @@ CollectorCtrl is the definitive, enterprise-grade platform for OpenTelemetry (OT
 
 **Category:** Fleet Orchestration
 
-Apply Kubernetes-style label selectors to target precise collector rings. When an agent's attributes match a policy selector (e.g., `env: production`), the Supervisor agent hot-reloads the pipeline in real time via the OpAMP WebSocket channel — **0ms pipeline downtime on config push**.
+Apply Kubernetes-style label selectors to target precise collector rings. When an agent's attributes match a policy selector (e.g., `env: production`), the Supervisor applies the pipeline update in place via the OpAMP channel — a fast, supervised restart with self-healing fallback.
 
 - **matchLabels Targeting**: Define policies that match agents by environment, service, host, or any custom attribute.
-- **OpAMP Policy Push**: Configuration delivery is executed over the encrypted `wss://` control channel.
-- **Hot-Reload**: No service restarts required. Pipelines are reconfigured in place.
+- **OpAMP Policy Push**: Configuration delivery is executed over the WebSocket control channel (`ws://` by default, `wss://` when TLS is configured).
+- **Self-Healing Apply**: Crash-looping configurations are detected automatically and the agent falls back to a known-good state.
 
 ---
 
@@ -20,10 +20,10 @@ Apply Kubernetes-style label selectors to target precise collector rings. When a
 
 **Category:** Configuration Integrity
 
-Stop fighting configuration sprawl. CollectorCtrl is the **single source of truth** — it continuously validates edge configurations against defined policies and auto-corrects any divergence.
+Stop fighting configuration sprawl. CollectorCtrl is the **single source of truth** — it continuously validates edge configurations against defined policies and corrects any divergence.
 
-- **Indisputable Source of Truth**: Any manual on-disk configuration edits on agent nodes are instantly overwritten by the Supervisor with the server's authorized snapshot.
-- **Continuous Reconciliation**: The Supervisor's Local Drift Guardian watches file integrity and triggers reconciliation automatically.
+- **Indisputable Source of Truth**: Every agent reports its effective configuration hash with each heartbeat; the server compares it against the governed policy.
+- **Configurable Remediation**: A per-policy **DriftPolicy** (`alert_only` / `auto_remediate`) flags drift in the UI or automatically re-pushes the authorized configuration.
 - **Real-Time Sync Status**: The Admin UI shows each agent's sync state — `In sync`, `Reconciling`, or `Drifted`.
 
 ---
@@ -60,7 +60,7 @@ Integrate with enterprise identity providers. Just-in-Time account provisioning 
 
 - **Supported Providers**: Azure AD, Okta, Auth0, and any OIDC-compliant provider.
 - **Just-in-Time Provisioning**: User accounts are created automatically on first login.
-- **Group-to-Role Mapping**: Directory groups are dynamically mapped to CollectorCtrl roles (Admin, Operator, Viewer).
+- **Group-to-Role Mapping**: Directory groups are dynamically mapped to CollectorCtrl roles (Admin, Editor, Viewer).
 
 ---
 
@@ -95,13 +95,25 @@ Real-time visibility into all connected collectors across Windows, Linux, and Ku
 Fine-grained permissions enforced at the API level.
 
 - **Admin**: Full control over the system, users, fleet configurations, and all settings.
-- **Operator**: Can manage configurations and control agents, but cannot manage users or system settings.
+- **Editor**: Can manage configurations and control agents, but cannot manage users or system settings.
 - **Viewer**: Read-only access to fleet status and configuration history.
-- **Custom Roles** *(coming soon)*: Define granular permission sets tailored to your organizational structure.
+- **Custom Roles**: Define granular permission sets tailored to your organizational structure in **System Settings → Users & Roles**.
 
 ---
 
-### 9. Cost Optimisation via Control Plane Policies
+### 9. Remote Supervisor Upgrades
+
+**Category:** Fleet Operations
+
+Upgrade the Supervisor agents themselves — fleet-wide, from the console.
+
+- **Package Distribution**: Upload Supervisor packages to the server's package store and target upgrade rings.
+- **Self-Upgrade & Swap**: The Supervisor downloads, verifies, and swaps its own binary in place.
+- **Self-Healing Rollback**: Failed upgrades automatically roll back to the previous working version — no stranded agents.
+
+---
+
+### 10. Cost Optimisation via Control Plane Policies
 
 **Category:** Observability FinOps
 

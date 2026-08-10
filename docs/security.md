@@ -6,17 +6,29 @@ CollectorCtrl is designed with a **"Secure by Default"** philosophy to meet the 
 
 ## Communication Security
 
-### TLS Encryption
+### Default Transport (HTTP / WS)
 
-- All communication between Supervisor agents and the Management Server occurs over **WSS (Secure WebSockets)**.
-- The Admin UI Console and REST API are served over **HTTPS**.
-- Minimum supported TLS version: **TLS 1.2** (TLS 1.3 strongly recommended for production).
+Out of the box, CollectorCtrl is optimized for local evaluation and private-network deployments:
+
+- The Admin UI Console and REST API are served over plain **HTTP** on port `4321` (`http://<server>:4321`).
+- Supervisor agents connect to the OpAMP gateway over **`ws://`** on port `4320`.
+
+> ⚠️ Before exposing the console beyond localhost or a trusted network, enable TLS (below) and change the default `admin` credentials.
+
+### Production TLS
+
+Two supported approaches for securing the console:
+
+- **Reverse Proxy (Recommended)**: Terminate TLS on port 443 with **IIS**, **Nginx**, or **Caddy** and forward to `http://localhost:4321` — managed certificates, standard ports, no app-level TLS config.
+- **Native HTTPS**: Set `COLLECTORCTRL_UI_HTTPS=true` with `COLLECTORCTRL_UI_ADDR`, `COLLECTORCTRL_UI_CERT`, and `COLLECTORCTRL_UI_KEY` on the server service. Minimum supported TLS version: **TLS 1.2** (TLS 1.3 strongly recommended).
+
+For the **OpAMP channel**, agents use `wss://` when the gateway terminates TLS; certificate trust is configured per-agent in `supervisor.yaml`.
 
 ### Mutual TLS (mTLS) Support
 
 - CollectorCtrl supports **client-certificate-based authentication** for Supervisor agents.
 - Each agent can be provisioned with a unique certificate to prevent impersonation and spoofing.
-- Certificate configuration is managed via the `tls.ca_file` field in `supervisor.yaml` (Linux) or the Server Configuration page of the Windows installer.
+- Certificate configuration is managed via the `tls.ca_file` field in `supervisor.yaml` (Linux) or the Server Connection page of the Windows installer.
 
 ---
 
@@ -26,7 +38,7 @@ CollectorCtrl is designed with a **"Secure by Default"** philosophy to meet the 
 
 CollectorCtrl integrates with enterprise identity providers using the **OpenID Connect (OIDC)** protocol:
 
-- **Supported Providers**: Azure AD, Okta, Auth0, and any OIDC-compliant identity provider.
+- **Supported Providers**: Microsoft Entra ID (Azure AD), Okta, Auth0, and any OIDC-compliant identity provider.
 - **Just-in-Time (JIT) Provisioning**: User accounts are created automatically upon first login — no manual user creation required.
 - **Group-to-Role Mapping**: Directory groups are dynamically mapped to CollectorCtrl roles, ensuring access stays synchronized with your identity provider.
 
@@ -37,15 +49,15 @@ User permissions are strictly enforced at the API level. Standard roles include:
 | Role | Permissions |
 | :--- | :--- |
 | **Admin** | Full control — manage system settings, users, roles, and all fleet configurations |
-| **Operator** | Manage configurations and control agents; cannot manage users or system settings |
+| **Editor** | Manage configurations and control agents; cannot manage users or system settings |
 | **Viewer** | Read-only access to fleet status, configuration history, and audit logs |
 
-Custom roles with granular permission sets are available in the System Settings.
+Custom roles with granular permission sets can be defined in **System Settings → Users & Roles**.
 
 ### Authentication
 
 - **JWT (JSON Web Tokens)**: Secure, signed tokens for session management. Tokens are short-lived and automatically rotated.
-- **API Tokens**: Long-lived machine tokens for Supervisor agent registration and programmatic API access (managed in *System Settings > SSO & API Tokens*).
+- **API Tokens**: Long-lived machine tokens for Supervisor agent registration and programmatic API access (managed in **Settings → API Tokens**).
 - **Bcrypt Hashing**: All local user passwords are salted and hashed using Bcrypt before storage.
 
 ---
@@ -73,10 +85,12 @@ Compatible SIEM destinations: **Splunk**, **Elastic**, **Datadog**, and any OTLP
 
 ### Drift Guardian — Configuration Integrity
 
-The Supervisor's **Local Drift Guardian** provides tamper-resistance at the edge:
-- Continuously watches on-disk configuration file integrity via checksum comparison.
-- Any manual edits to the managed `config.yaml` on the agent node are **instantly overwritten** with the server's authorized configuration snapshot.
-- This ensures that agent nodes cannot independently diverge from the centrally-governed policy — even with direct OS-level access.
+Configuration integrity is enforced through continuous reconciliation:
+
+- Every Supervisor reports its **effective configuration hash** to the server with each OpAMP heartbeat.
+- The server compares the reported hash against the governed policy. Any divergence is flagged in real time (`In sync` / `Reconciling` / `Drifted`).
+- A configurable **DriftPolicy** (`alert_only` or `auto_remediate`) determines whether drift only raises an alert or is automatically corrected by re-pushing the authorized configuration.
+- This ensures agent nodes cannot silently diverge from centrally-governed policy — even with direct OS-level access.
 
 ---
 

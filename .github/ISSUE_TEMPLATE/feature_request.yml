@@ -1,0 +1,33 @@
+name: 💡 Feature Request
+description: Suggest an idea or enhancement for CollectorCtrl
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem are you trying to solve? (e.g., "Managing X across my fleet is painful because...")
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Describe the behavior or capability you'd like to see.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any workarounds or alternative solutions you've evaluated.
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Fleet size, environment, related OTel components, screenshots, etc.
+    validations:
+      required: false

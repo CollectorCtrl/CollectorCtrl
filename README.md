@@ -2,7 +2,7 @@
 
 [![Release](https://img.shields.io/github/v/release/CollectorCtrl/CollectorCtrl?display_name=tag)](https://github.com/CollectorCtrl/CollectorCtrl/releases)
 [![License](https://img.shields.io/github/license/CollectorCtrl/CollectorCtrl)](LICENSE)
-[![Docker Image](https://github.com/CollectorCtrl/CollectorCtrl/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/CollectorCtrl/CollectorCtrl/actions/workflows/docker-publish.yml)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io-blue?logo=docker&logoColor=white)](https://github.com/CollectorCtrl/CollectorCtrl/pkgs/container/collectorctrl-server)
 [![Docs](https://img.shields.io/badge/docs-collectorctrl.com-blue)](https://collectorctrl.com/docs)
 [![OpAMP](https://img.shields.io/badge/protocol-OpAMP-6f42c1)](https://github.com/open-telemetry/opamp-spec)
 

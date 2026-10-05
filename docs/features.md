@@ -1,128 +1,133 @@
-# CollectorCtrl: Feature Overview
+# Features
 
-CollectorCtrl is the definitive, enterprise-grade platform for OpenTelemetry (OTel) fleet governance. Built on the industry-standard **OpAMP** (Open Agent Management Protocol), it shifts telemetry pipeline administration from manual, error-prone node-by-node edits to a centralized, policy-driven control plane — ensuring absolute configuration integrity, drift prevention, and unified governance.
+What CollectorCtrl does as of **v0.5.5-beta**. Everything is **beta** unless marked otherwise.
 
-## Platform Capabilities
-
-### 1. Dynamic Target Policies
-
-**Category:** Fleet Orchestration
-
-Apply Kubernetes-style label selectors to target precise collector rings. When an agent's attributes match a policy selector (e.g., `env: production`), the Supervisor applies the pipeline update in place via the OpAMP channel — a fast, supervised restart with self-healing fallback.
-
-- **matchLabels Targeting**: Define policies that match agents by environment, service, host, or any custom attribute.
-- **OpAMP Policy Push**: Configuration delivery is executed over the WebSocket control channel (`ws://` by default, `wss://` when TLS is configured).
-- **Self-Healing Apply**: Crash-looping configurations are detected automatically and the agent falls back to a known-good state.
-
----
-
-### 2. Drift Prevention
-
-**Category:** Configuration Integrity
-
-Stop fighting configuration sprawl. CollectorCtrl is the **single source of truth** — it continuously validates edge configurations against defined policies and corrects any divergence.
-
-- **Indisputable Source of Truth**: Every agent reports its effective configuration hash with each heartbeat; the server compares it against the governed policy.
-- **Configurable Remediation**: A per-policy **DriftPolicy** (`alert_only` / `auto_remediate`) flags drift in the UI or automatically re-pushes the authorized configuration.
-- **Real-Time Sync Status**: The Admin UI shows each agent's sync state — `In sync`, `Reconciling`, or `Drifted`.
+- [Fleet management](#fleet-management)
+- [Configuration and policies](#configuration-and-policies)
+- [Drift prevention and configuration integrity](#drift-prevention-and-configuration-integrity)
+- [GitOps](#gitops)
+- [Sidecar collectors](#sidecar-collectors)
+- [Supervisor and collector lifecycle](#supervisor-and-collector-lifecycle)
+- [Custom Builder](#custom-builder)
+- [AI Copilot](#ai-copilot)
+- [MCP server](#mcp-server)
+- [Telemetry Governor](#telemetry-governor)
+- [ZeroTouch instrumentation (alpha)](#zerotouch-instrumentation-alpha)
+- [Identity and access](#identity-and-access)
+- [Audit and compliance](#audit-and-compliance)
+- [Notifications](#notifications)
+- [Operations](#operations)
 
 ---
 
-### 3. Atomic Versioning & Canary Rollouts
+## Fleet management
 
-**Category:** Version Control
+- **Live inventory** of every collector connected over OpAMP: health, status reason, version, OS and architecture, effective configuration, attributes and last heartbeat.
+- **Three views:** a searchable table with configurable columns and quick filters, a **honeycomb** health map, and a **topology** view of collectors, gateways and their connections.
+- **Classification:** ordered environment and role rules (agent, gateway, sidecar) with operators such as equals, contains, starts/ends with and regex. A live preview shows exactly which collectors a rule matches before you save it.
+- **Remote control:** start, stop and restart collectors (and sidecars) individually or in bulk. Every command is audit-logged.
+- **Configuration templates:** the distinct configurations running across the fleet, which collectors use each one, and which recently moved between templates.
 
-Every YAML edit is SHA-hashed and versioned. Deploy changes to a **canary ring** first, validate behavior under real load, then promote — or **rollback in under 1 second** with a single click.
+## Configuration and policies
 
-- **SHA-Hashed Versions**: Immutable, content-addressable configuration snapshots.
-- **Canary Rings**: Target a percentage of your fleet (e.g., 10%) before full rollout.
-- **One-Click Rollback**: Instantly restore any previous configuration version across the entire fleet.
+- **Fleet policies** target collectors with Kubernetes-style label selectors (`matchLabels`, `matchExpressions`), including the `collectorctrl.environment` and `collectorctrl.role` classification attributes.
+- **Versioned configurations:** every change is SHA-256 hashed and versioned, with full policy history.
+- **Canary rollouts:** deploy to a share of the matching collectors first, then **Promote** or **Abort**. Canaries survive server restarts. Aborting never releases the new config to the rest of the fleet.
+- **Rollback** restores the complete saved policy and records it as a new version.
+- **Safe editing:** optimistic concurrency means a save is refused instead of overwriting a colleague's newer change.
+- **Durable saves:** a save reports success only once it's stored. The UI shows separately whether the change was delivered and whether the collector confirmed it.
+- **Per-collector overrides** and **configuration history** with side-by-side or unified diffs, compare-any-two, search by author or SHA, and one-click restore.
 
----
+## Drift prevention and configuration integrity
 
-### 4. Hybrid Sidecar Pipelines
+- Every supervisor reports its effective configuration hash. The server compares it with the governed configuration and shows each collector as in sync, reconciling or drifted.
+- Per policy, drift is either **reported** or **automatically reverted**.
+- **Validate before apply:** the Supervisor checks every new config with the collector itself. A config the collector rejects never replaces the running one, and the push is marked failed with the collector's own error message.
+- **Crash-loop rollback:** if a config passes validation but makes the collector crash repeatedly, the Supervisor returns to the last known good config and reports the failure.
 
-**Category:** Pipeline Architecture
+## GitOps
 
-OTel YAML configurations are already complex. Layering SIEM routing and AI processing into the same collector compounds edge complexity. CollectorCtrl lets you isolate your **observability pipeline** from your **intelligence pipeline** — a custom sidecar runs separate OTel components, protecting your core telemetry path.
+- Connect a **GitHub or GitHub Enterprise** repository, with a built-in check of repository access, branch, write permission and policy files.
+- **Export** current policies and overrides to the repository in one commit.
+- **Automatic sync** on a schedule (default 60 s), and within seconds via a signed webhook. Every change goes through the same validation, canary gate, history and audit as a UI edit.
+- **Drift view:** side-by-side diff between Git and the running state. Choose report-only, or let Git restore the approved configuration.
+- **Pull requests from CollectorCtrl,** with status tracking; **emergency commits** require a reason.
+- Details: [GitOps guide](gitops.md).
 
-- **Isolated SIEM Routing**: Route security event streams to Splunk, Elastic, or custom SIEM endpoints independently.
-- **Custom OTel Components**: Run vendor-distributed or custom-compiled collector binaries as the managed sidecar process.
-- **AI Pipeline Separation**: Keep AI/ML processing integrations from interfering with core observability paths.
+## Sidecar collectors
 
----
+- A second collector on the same host, supervised independently: for example a SIEM pipeline kept separate from the observability pipeline, with RBAC per team.
+- Start, stop, restart, reconfigure or disable the sidecar without touching the main collector. **Restart Both** is available when you need it.
+- Separate health: a failing sidecar never marks the main collector unhealthy.
+- Sidecar status in the fleet table, summary, honeycomb and topology views, with **Has sidecar** and **Sidecar issues** filters.
 
-### 5. OIDC Identity & SSO
+## Supervisor and collector lifecycle
 
-**Category:** Identity & Access Management
+- **Signed package repository** for supervisor, collector and sidecar packages, with a Trust column (Release-signed / Signed by … / Unsigned).
+- **Supervisor upgrades** accept only the vendor release signature, so even a compromised server can't push a new supervisor.
+- **Collector and sidecar upgrades** accept a release signature or an explicit **Sign** approval in the UI, recorded in the audit log.
+- **Fleet-wide upgrade governance:** upgrades are throttled and queued, and a bulk upgrade halts automatically if too many fail. A new supervisor that can't reconnect within its watchdog window rolls itself back to the previous version. Collector upgrades are verified after install and rolled back on failure. A collector you stopped on purpose stays stopped after an upgrade.
 
-Integrate with enterprise identity providers. Just-in-Time account provisioning and dynamic directory group-to-role mappings mean **zero manual user management**.
+## Custom Builder
 
-- **Supported Providers**: Azure AD, Okta, Auth0, and any OIDC-compliant provider.
-- **Just-in-Time Provisioning**: User accounts are created automatically on first login.
-- **Group-to-Role Mapping**: Directory groups are dynamically mapped to CollectorCtrl roles (Admin, Editor, Viewer).
+- Build tailored collector binaries with the OpenTelemetry Collector Builder (`ocb`) from the UI, choosing only the components you need.
+- Built packages land in the package repository, where you sign them and roll them out like any other collector.
 
----
+## AI Copilot
 
-### 6. SIEM OTLP Audit Streaming
+- A chat assistant **inside the control plane** that answers from **live fleet data** using read-only tools (fleet health, configs, history, policies, audit, Governor analytics), with web search optional.
+- **Streams** its answer and each tool step as it works. Supports slash commands, `@`-mentions of collectors, policies and pipelines, syntax-highlighted YAML, and a dockable panel. Open it from the config editor with a collector's configuration attached.
+- **Proposes, never applies:** a change comes as a proposal with a diff and blast radius, which a person approves in **Settings → Pending AI Actions**. The Copilot can't approve its own proposals.
+- **Bring your own model:** OpenAI, Anthropic, Google Gemini, or any **OpenAI-compatible endpoint**, including self-hosted and enterprise-approved models. Optional PII redaction.
+- Every Copilot action is audit-logged.
 
-**Category:** Compliance
+Details: [AI Copilot and MCP](ai-copilot-and-mcp.md).
 
-Meet compliance requirements without bolt-on solutions. Every administrator action and data mutation is streamed in real time as **structured OTLP log events** directly into your SIEM — no custom integrations or log scrapers required.
+## MCP server
 
-- **Real-Time OTLP Events**: Audit events are emitted via the OpenTelemetry Protocol.
-- **Compatible SIEMs**: Splunk, Elastic, Datadog, and any OTLP-compatible endpoint.
-- **SOC 2 Ready**: Provides the immutable audit trail required for SOC 2 compliance audits.
+- A built-in **Model Context Protocol** endpoint (`/api/mcp`), plus a stdio adapter (`collectorctrl-mcp`) for Claude Desktop, Cursor and other MCP clients.
+- **60+ tools:** fleet, configs, policies and canaries, GitOps, templates, history, upgrades, Telemetry Governor, discovery, sidecars and notifications. Also **4 runbook prompts**: triage an unhealthy collector, standardize config drift, make a safe fleet change, troubleshoot a sidecar.
+- **Governed:** API-token authentication, per-tool RBAC, an audit entry per call (`mcp:<user>`), human approval for every change, blast-radius caps, 15-minute proposal expiry, and optional four-eyes approval.
 
----
+## Telemetry Governor
 
-### 7. Centralized Fleet Management
+- **Telemetry taps** on running collectors that keep **100% of errors** (error logs, failed spans) and sample the rest, without blocking or slowing the primary pipeline.
+- **Command Center:** volume and cardinality analytics, pattern intelligence, and an edge filter generator that turns recurring noise into filter rules.
+- **Destinations:** fan out to S3 (partitioned, Athena-ready) or OTLP endpoints, with connectivity tests.
+- Use it to see where ingest cost comes from and cut it at the edge, before data reaches paid backends.
 
-**Category:** Fleet Operations
+## ZeroTouch instrumentation (alpha)
 
-Real-time visibility into all connected collectors across Windows, Linux, and Kubernetes.
+- **Application discovery** on managed hosts: runtime, framework and version of running applications. Off by default and controlled per host, with every toggle audited.
+- **Enable or remove** OpenTelemetry agents for **Java, .NET, Node.js and Python** from the UI, with an optional canary cohort. Services (Windows services, IIS app pools, systemd units) are marked "restart required" and pick up instrumentation on their next restart; standalone processes are relaunched under supervision.
+- **Agent baselines and central catalog** manage instrumentation agent versions across the fleet, with group overrides and per-node pins.
+- **Safety:** nodes act only on their own discovery data, only `OTEL_*` variables are accepted, services are never restarted without consent, relaunched apps keep their original user, and agent assets are checksum-pinned.
+- Verified end to end for Java, Node.js and Python. .NET support is partial and depends on the framework.
 
-- **Live Inventory**: See all agents, their status, version, and last heartbeat at a glance.
-- **Connectivity & Health Monitoring**: Track OpAMP connection state and synchronization status per agent.
-- **Resource Tagging**: Identify and filter agents by host, environment, service, or custom attributes.
+## Identity and access
 
----
+- **Per-agent identity:** enrollment tokens and per-agent credentials bound to the instance UID, impersonation detection, revoke and re-enroll.
+- **OIDC single sign-on** with guided setup and presets for Okta, Microsoft Entra ID, Google Workspace, Keycloak and Auth0. A **test sign-in** shows the claims and resulting role before you switch SSO on. Includes JIT provisioning, ordered group-to-role rules, break-glass local admins, and local sign-in that keeps working if the IdP is down.
+- **RBAC:** built-in Admin, Editor and Viewer roles plus custom roles with granular permissions and environment scoping. A **grant ceiling** means nobody can hand out permissions they don't hold.
+- **API tokens** for automation and MCP clients, scoped by role and environment.
 
-### 8. Enterprise Role-Based Access Control (RBAC)
+## Audit and compliance
 
-**Category:** Security & Governance
+- **Tamper-evident audit trail:** entries are hash-chained, and **Verify integrity** pinpoints any altered entry.
+- Each event records who acted (person, named API token, AI or system), source IP, user agent, request ID and outcome. Refused requests are recorded too.
+- Server-side search across the full history, shareable filtered links, CSV export.
+- **SIEM streaming:** audit events in real time as OTLP logs, over TLS, to any OTLP-compatible endpoint.
 
-Fine-grained permissions enforced at the API level.
+## Notifications
 
-- **Admin**: Full control over the system, users, fleet configurations, and all settings.
-- **Editor**: Can manage configurations and control agents, but cannot manage users or system settings.
-- **Viewer**: Read-only access to fleet status and configuration history.
-- **Custom Roles**: Define granular permission sets tailored to your organizational structure in **System Settings → Users & Roles**.
+- In-app notifications with per-user read state, linking to the affected collector or page.
+- Alert channels including email (SMTP), webhooks and PagerDuty (routing keys, with repeat alerts grouped).
+- Events include disconnects, rejected configs, failed or rolled-back upgrades, impersonation attempts, Git sync failures and instrumentation results.
 
----
+## Operations
 
-### 9. Remote Supervisor Upgrades
-
-**Category:** Fleet Operations
-
-Upgrade the Supervisor agents themselves — fleet-wide, from the console.
-
-- **Package Distribution**: Upload Supervisor packages to the server's package store and target upgrade rings.
-- **Self-Upgrade & Swap**: The Supervisor downloads, verifies, and swaps its own binary in place.
-- **Self-Healing Rollback**: Failed upgrades automatically roll back to the previous working version — no stranded agents.
-
----
-
-### 10. Cost Optimisation via Control Plane Policies
-
-**Category:** Observability FinOps
-
-Reduce observability spend directly at the collection layer.
-
-- **Fleet-Wide Sampling Rates**: Define tail-sampling rules and push them to every collector instantly.
-- **Drop-Filter Policies**: Strip high-volume debug traces and redundant metric cardinality fleet-wide.
-- **Attribute-Scrubbing Rules**: Remove PII or high-cardinality label sets before data leaves the edge.
-
----
-
-*CollectorCtrl helps enterprises scale their OpenTelemetry footprint with confidence, compliance, and minimal operational overhead. Visit [collectorctrl.com](https://collectorctrl.com) for the full documentation suite.*
+- **Single binary** server with an embedded web UI. SQLite or PostgreSQL. Windows service, systemd, launchd or container.
+- **TLS by default** with a per-install CA, or bring your own certificates or reverse proxy.
+- **One-command backup and restore**, including keys, certificates and state.
+- **REST API** with an OpenAPI specification ([docs/api/openapi.json](api/openapi.json)).
+- **Signed releases:** every download has a detached Ed25519 signature.

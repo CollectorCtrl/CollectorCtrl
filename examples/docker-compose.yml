@@ -1,0 +1,64 @@
+# CollectorCtrl Server with PostgreSQL, in production mode.
+#
+# Secrets are REQUIRED. Put them in an .env file next to this file
+# (chmod 600, never commit it):
+#
+#   COLLECTORCTRL_JWT_SECRET=<openssl rand -hex 32>
+#   COLLECTORCTRL_ENCRYPTION_KEY=<openssl rand -hex 32>
+#   POSTGRES_PASSWORD=<openssl rand -hex 24>
+#
+# `docker compose up -d` refuses to start while any of them is missing.
+#
+# Back up BOTH volumes:
+#   collectorctrl_data  - per-install CA, private keys, secrets, packages
+#   postgres_data       - the database
+#
+# The UI is served over HTTPS on port 4321 using the server's own CA.
+# See docs/configuration.md to use your own certificate or a TLS proxy.
+
+services:
+  collectorctrl-server:
+    image: ghcr.io/collectorctrl/collectorctrl-server:latest
+    ports:
+      - "4320:4320" # OpAMP gateway (WSS)
+      - "4321:4321" # UI, REST API, MCP (HTTPS)
+    environment:
+      - COLLECTORCTRL_MODE=production
+      - COLLECTORCTRL_DATA_DIR=/var/lib/collectorctrl
+      - COLLECTORCTRL_DB_TYPE=postgres
+      - COLLECTORCTRL_DB_DSN=host=postgres user=collectorctrl password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD} dbname=collectorctrl port=5432 sslmode=disable
+      - COLLECTORCTRL_JWT_SECRET=${COLLECTORCTRL_JWT_SECRET:?set COLLECTORCTRL_JWT_SECRET}
+      - COLLECTORCTRL_ENCRYPTION_KEY=${COLLECTORCTRL_ENCRYPTION_KEY:?set COLLECTORCTRL_ENCRYPTION_KEY}
+      # Optional: the external URL / host name agents and browsers use.
+      # Added to the server certificate and used in onboarding commands.
+      # - COLLECTORCTRL_URL=https://collectorctrl.example.com:4321
+    volumes:
+      - collectorctrl_data:/var/lib/collectorctrl
+      - collectorctrl_logs:/var/log/collectorctrl
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=collectorctrl
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      - POSTGRES_DB=collectorctrl
+    # Not published on the host: only the server container needs it.
+    expose:
+      - "5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U collectorctrl -d collectorctrl"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  collectorctrl_data:
+  collectorctrl_logs:
+  postgres_data:

@@ -1,37 +1,40 @@
-# Feedback & Support for CollectorCtrl
+# Contributing to CollectorCtrl
 
-We love your input! CollectorCtrl is source-available under a commercial license, and the best way to contribute right now is through feedback. Your input is essential to making this the best OpAMP management plane in the industry.
+Thank you for helping make CollectorCtrl better. This repository hosts CollectorCtrl's releases, documentation and issue tracker. The product's source code isn't public, so the most valuable contributions right now are **feedback, bug reports and documentation fixes**.
 
-## How you can contribute
+## Ways to contribute
 
-Contributions currently focus on:
+- **Report a bug:** something in the installer, the UI, the Supervisor or the docs doesn't work as described.
+- **Request a feature:** tell us the problem you're trying to solve and your use case.
+- **Improve the documentation:** pull requests to `README.md`, `docs/` and `examples/` are welcome.
+- **Share your experience:** fleet size, platforms, collector distributions and integrations you use help us prioritize. Email [connect@collectorctrl.com](mailto:connect@collectorctrl.com) to join the beta programme.
 
-- **Reporting Bugs**: Found a glitch in the installer or the UI? Let us know.
-- **Feature Requests**: Need a specific OTel feature? Tell us your use case.
-- **Documentation**: Spot a typo or a confusing section in the docs?
-- **User Experience**: Have ideas for making the dashboard more intuitive?
+## Reporting bugs
 
-## Reporting Bugs
+Use the [bug report form](https://github.com/CollectorCtrl/CollectorCtrl/issues/new?template=bug_report.yml). A good report includes:
 
-We use GitHub issues to track public bugs. Report a bug by opening a new issue; it's that easy!
+- the CollectorCtrl **server and Supervisor versions** (shown in the UI and in the release file names);
+- your platform (OS and architecture, Docker or Kubernetes, SQLite or PostgreSQL);
+- the collector distribution and version;
+- steps to reproduce, and what you expected versus what happened;
+- relevant log excerpts (server, Supervisor) and screenshots.
 
-### Write great bug reports
+**Redact tokens, enrollment tokens, credentials, private keys and internal host names** before posting logs or configs.
 
-A good bug report helps us fix the issue faster. Please include:
+## Documentation pull requests
 
-- A quick summary of the issue.
-- **Steps to reproduce**: Be specific!
-- **Environment details**: (e.g., Windows version, Collector version).
-- What you expected would happen vs. what actually happened.
-- Screenshots or log snippets from `server.log` or `supervisor.log` (if safe — please redact tokens and credentials).
+1. Fork the repository and create a branch.
+2. Keep changes focused, and check that links work.
+3. Describe what you changed and why in the pull request.
 
-## Security Vulnerabilities
+## Security vulnerabilities
 
-Please do **not** report security vulnerabilities via public GitHub issues. Instead, please contact the maintainers directly at the contact information provided in our [Security Policy](docs/security.md).
+Please **don't** open public issues for security problems. Follow [SECURITY.md](SECURITY.md) instead.
 
-## License
+## Code of conduct
 
-By providing feedback or reporting bugs, you agree that your suggestions may be incorporated into the product, which is licensed under the Apache License 2.0.
+Everyone taking part is expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
----
-*Thank you for helping us build the future of observability management!*
+## Licensing of contributions
+
+By submitting feedback, issues or pull requests, you agree that CollectorCtrl may use your suggestions and include your documentation contributions in the project, under the terms in [LICENSE](LICENSE).

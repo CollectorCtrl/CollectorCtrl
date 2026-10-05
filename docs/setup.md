@@ -1,331 +1,227 @@
-# Setup & Installation Guide
+# Installation
 
-This guide details the prerequisites, deployment procedures, service configuration, and troubleshooting steps required to install and run the **CollectorCtrl** Management Server and the **Supervisor Agent** in production environments.
+This guide installs the **CollectorCtrl Server**. To connect hosts afterwards, see [Connecting collectors](agent-onboarding.md).
+
+- [Before you start](#before-you-start)
+- [Docker](#docker)
+- [Docker Compose with PostgreSQL](#docker-compose-with-postgresql)
+- [Windows](#windows)
+- [Linux](#linux)
+- [macOS](#macos)
+- [Kubernetes](#kubernetes)
+- [First sign-in](#first-sign-in)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
-## Network & Firewalls: Port Allocation
+## Before you start
 
-Ensure your network security groups and firewall policies allow traffic on the following ports:
+### Release files
 
-| Port | Type | Direction | Description |
+Download from the [latest release](https://github.com/CollectorCtrl/CollectorCtrl/releases). Replace `<version>` below with the release version, for example `0.5.5-beta`.
+
+| Platform | Server | Supervisor (for managed hosts) |
+| :--- | :--- | :--- |
+| Windows | `collectorctrl-server_<version>_windows_<arch>.exe`: installer, SQLite edition<br>`collectorctrl-server-postgres_<version>_windows_<arch>.exe`: installer, PostgreSQL edition | `collectorctrl-supervisor-setup_<version>_windows_<arch>.exe`: installer<br>`collectorctrl-supervisor_<version>_windows_<arch>.exe`: binary only |
+| Linux | `collectorctrl-server_<version>_linux_<arch>.tar.gz`<br>`collectorctrl-server-postgres_<version>_linux_<arch>.tar.gz` | `collectorctrl-supervisor_<version>_linux_<arch>.tar.gz` |
+| macOS | `collectorctrl-server_<version>_darwin_<arch>.tar.gz`<br>`collectorctrl-server-postgres_<version>_darwin_<arch>.tar.gz` | `collectorctrl-supervisor_<version>_darwin_<arch>.tar.gz` |
+
+`<arch>` is `amd64` or `arm64`. Each file has a `.sig` next to it: [verify it](verifying-downloads.md) before installing.
+
+> You rarely need to download the Supervisor by hand. The **Get Started** page in the UI generates a command that fetches and installs it for you.
+
+### Ports
+
+| Port | Direction | Purpose |
+| :--- | :--- | :--- |
+| **4320/tcp** | Inbound to the server | OpAMP gateway. Supervisors connect here over **WSS** (TLS). |
+| **4321/tcp** | Inbound to the server | Web UI, REST API, MCP endpoint, onboarding scripts and package downloads, over **HTTPS**. Supervisors also download packages from this port. |
+| 5432/tcp | Server to PostgreSQL | Only with the PostgreSQL edition. |
+
+Supervisors only make **outbound** connections. No inbound ports are needed on managed hosts.
+
+### Sizing
+
+| Fleet | CPU | Memory | Database |
 | :--- | :--- | :--- | :--- |
-| **4320** | TCP / WS (WSS with TLS) | Inbound to Server | **OpAMP Gateway**: WebSocket control channel for active Supervisors |
-| **4321** | TCP / HTTP (HTTPS with TLS) | Inbound to Server | **Dashboard Console**: Exposes the Admin UI and REST API |
-| **13133** | TCP | Localhost only | **OTel Health Check**: Used by Supervisor to check collector health |
-| **5432** | TCP | Localhost / Outbound | **PostgreSQL Store**: Database connection (if using Postgres) |
+| Evaluation, up to ~250 collectors | 2 vCPU | 2–4 GB | SQLite |
+| Up to 1,000 collectors | 4 vCPU | 4–8 GB | SQLite or PostgreSQL |
 
-> *Note: The Supervisor Agent connects **outbound** to the Server on port 4320. No inbound ports need to be opened on the agent machines themselves.*
+In our load tests (August 2026) the server used under 135 MB of memory with 1,000 connected collectors on both SQLite and PostgreSQL. Larger fleets are not benchmarked yet. Run a **single server instance**: multi-replica high availability isn't supported yet.
 
-> ⚠️ **HTTP by default**: The console is served over plain **HTTP** (`http://<server>:4321`) and agents connect over **`ws://`** unless TLS is configured. See [Production HTTPS](#4-production-https) before exposing the UI to a network.
+### Where the server keeps its state
 
----
+On first start the server creates a **certificate authority**, a server certificate, an encryption key, a session-signing secret, an OpAMP secret and a package-signing key in its **data directory**. Agents trust that CA. **Back it up and keep it persistent:** if it's lost, every agent has to be re-enrolled.
 
-## Prerequisites: Target Host Requirements
+| Install type | Data directory |
+| :--- | :--- |
+| Docker image | `/var/lib/collectorctrl` (declare it as a volume) |
+| Windows | `%PROGRAMDATA%\CollectorCtrl` |
+| Linux / macOS archive | The server's working directory (`/opt/collectorctrl-server` with the bundled systemd unit), unless you set `COLLECTORCTRL_DATA_DIR` |
 
-Before executing the Supervisor installation, prepare the target system:
-
-1. **OTel Collector Binary**: Ensure a pre-compiled OpenTelemetry Collector binary is present on the system.
-   - **Windows default path**: `C:\Program Files\otelcol\otelcol.exe`
-   - **Linux default path**: `/usr/local/bin/otelcol`
-2. **Local Administrator Privileges**: The installer must register background system services/daemons.
-3. **Outbound Connectivity**: The host must resolve and reach the Management Server over the network via Port `4320`.
+Set `COLLECTORCTRL_DATA_DIR` to put it somewhere specific. See [Configuration](configuration.md#data-directory).
 
 ---
 
-## 1. Management Server Installation
-
-### Option A: Docker (fastest evaluation)
+## Docker
 
 ```bash
-docker run -d \
-  --name collectorctrl \
-  --restart always \
-  -p 4320:4320 \
-  -p 4321:4321 \
-  -v collectorctrl-data:/opt/collectorctrl \
+docker run -d --name collectorctrl --restart unless-stopped \
+  -p 4320:4320 -p 4321:4321 \
+  -v collectorctrl-data:/var/lib/collectorctrl \
+  -v collectorctrl-logs:/var/log/collectorctrl \
   ghcr.io/collectorctrl/collectorctrl-server:latest
 ```
 
-Open 👉 **`http://localhost:4321`** and log in with `admin` / `admin`.
+- Image: `ghcr.io/collectorctrl/collectorctrl-server`. `latest` tracks the newest build; immutable `main-<commit>` tags are also published.
+- Runs as a non-root user (UID 1000).
+- The database (SQLite), CA, secrets, uploaded packages and agent assets live under `/var/lib/collectorctrl`. **Do not mount a volume over `/opt/collectorctrl`**: that hides the application binaries.
+- Logs: `docker logs -f collectorctrl`.
 
-### Option B: Windows Installation
+For anything beyond a quick evaluation, run in production mode with your own secrets (next section).
 
-1. Download the installer from the [releases page](https://github.com/CollectorCtrl/CollectorCtrl/releases):
-   - **Standard Edition (SQLite)**: `CollectorCtrl_Setup.exe`
-   - **PostgreSQL Edition**: `CollectorCtrl-PostgreSQL-Setup.exe`
-2. Right-click and select **Run as Administrator**.
-3. Choose the installation directory (defaults to `C:\Program Files\CollectorCtrl`).
-4. **PostgreSQL Edition only**: enter your PostgreSQL host (`127.0.0.1`), port (`5432`), user, and password.
-5. Finish the wizard and leave **"Launch CollectorCtrl Web Console"** checked — the installer registers and starts the **`CollectorCtrl`** Windows Service, then opens your browser at **`http://localhost:4321`**.
-6. Authenticate using the default credentials:
-   - **Username**: `admin`
-   - **Password**: `admin`
-   - *⚠️ Change your password immediately after first login.*
+## Docker Compose with PostgreSQL
 
-Manage the service with `services.msc` or PowerShell (as Administrator):
+[`examples/docker-compose.yml`](../examples/docker-compose.yml) runs the server in production mode with PostgreSQL.
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/CollectorCtrl/CollectorCtrl/main/examples/docker-compose.yml
+
+cat > .env <<EOF
+COLLECTORCTRL_JWT_SECRET=$(openssl rand -hex 32)
+COLLECTORCTRL_ENCRYPTION_KEY=$(openssl rand -hex 32)
+POSTGRES_PASSWORD=$(openssl rand -hex 24)
+EOF
+chmod 600 .env
+
+docker compose up -d
+```
+
+- `docker compose up` refuses to start while any of the three secrets is missing.
+- PostgreSQL is reachable only from the server container. It isn't published on the host.
+- Back up **both** volumes: `collectorctrl_data` (CA, keys, secrets) and `postgres_data` (database). Keep `.env` in your secret manager: the secrets in it aren't stored anywhere else.
+
+## Windows
+
+Windows Server or Windows 10/11, on amd64 or arm64.
+
+1. Download one of the server installers:
+   - `collectorctrl-server_<version>_windows_<arch>.exe`: **SQLite edition**, no external database.
+   - `collectorctrl-server-postgres_<version>_windows_<arch>.exe`: **PostgreSQL edition**. The installer asks for the PostgreSQL host, port, user and password.
+2. Run it as Administrator. It installs to `C:\Program Files\CollectorCtrl`, registers and starts the **CollectorCtrl** Windows service, and offers to open the console at `https://localhost:4321`.
+3. Restrict the data directory, which holds private keys and secrets, to SYSTEM and Administrators:
+
+   ```powershell
+   icacls "$env:ProgramData\CollectorCtrl" /inheritance:r /grant:r "SYSTEM:(OI)(CI)F" "Administrators:(OI)(CI)F"
+   ```
+
+Manage the service from PowerShell (as Administrator):
 
 ```powershell
 Get-Service CollectorCtrl
 Restart-Service CollectorCtrl
-Stop-Service CollectorCtrl
 ```
 
-### Option C: Linux Installation (systemd)
-
-Supported: Ubuntu 18.04+, Debian 10+, RHEL 8+, CentOS 8+, Amazon Linux 2023.
-
-1. Download and extract the release package for your architecture (`amd64` or `arm64`):
-   ```bash
-   tar -xzf collectorctrl-server-postgres_1.1.x_linux_amd64.tar.gz
-   cd collectorctrl-server_linux_amd64
-   ```
-2. Run the automated installer:
-   ```bash
-   sudo ./install.sh
-   ```
-   The script automatically:
-   - Detects your package manager (`apt-get` or `yum`/`dnf`)
-   - Installs PostgreSQL (PostgreSQL edition) and creates the `collectorctrl` database and user
-   - Auto-configures `pg_hba.conf` for local authentication (`scram-sha-256`)
-   - Writes the connection string into the systemd unit at `/etc/systemd/system/collectorctrl.service`
-   - Installs to `/opt/collectorctrl-server` and starts the server on port `4321`
-3. Verify the service:
-   ```bash
-   sudo systemctl status collectorctrl
-   sudo journalctl -u collectorctrl -f
-   ```
-4. Access the web console at **`http://YOUR_SERVER_IP:4321`** and log in with `admin` / `admin` *(⚠️ change the password immediately)*.
-
----
-
-## 2. Supervisor Agent Installation
-
-### A. Windows Installation (Windows Service)
-
-The Windows installer handles service registration with the local Service Control Manager (SCM).
-
-1. Run `CollectorCtrl_Supervisor_Setup.exe` as an **Administrator**.
-2. **Server Connection Page**:
-   - **Server OpAMP Endpoint**: `ws://YOUR_SERVER_IP:4320/v1/opamp` (use `wss://` when TLS is configured)
-   - **API Token**: Enter the client registration key (generated in *Settings → API Tokens*).
-3. **Collector Configuration Page**:
-   - **OTel Executable Path**: `C:\Program Files\otelcol\otelcol.exe`
-   - **Initial Config (optional)**: Select an initial YAML config if you have one
-4. Finish the wizard. The installer writes `supervisor.yaml` to `C:\Program Files\CollectorCtrl Supervisor\` and starts the `CollectorCtrlSupervisor` service.
-
-#### Manual PowerShell Registration (Alternative)
-
-If installing via Configuration Management (Ansible, SCCM, Group Policy):
+To set environment variables (for example a TLS mode or your own certificate) for the service, write them to its registry `Environment` value and restart it. Upgrades keep this value.
 
 ```powershell
-# Create the service entry pointing to the supervisor binary and configuration file
-New-Service -Name "CollectorCtrlSupervisor" `
-            -BinaryPathName '"C:\Program Files\CollectorCtrl Supervisor\supervisor.exe" --config "C:\Program Files\CollectorCtrl Supervisor\supervisor.yaml"' `
-            -DisplayName "CollectorCtrl Supervisor" `
-            -StartupType Automatic
-
-# Start the service
-Start-Service -Name "CollectorCtrlSupervisor"
-```
-
----
-
-### B. Linux Installation (systemd Daemon)
-
-1. Extract the supervisor package and run the interactive installer:
-   ```bash
-   tar -xzf collectorctrl-supervisor_1.1.x_linux_amd64.tar.gz
-   cd collectorctrl-supervisor_linux_amd64
-   sudo ./install.sh
-   ```
-2. When prompted, enter your Management Server's OpAMP endpoint:
-   ```text
-   Management Server Endpoint [ws://localhost:4320/v1/opamp]: ws://YOUR_SERVER_IP:4320/v1/opamp
-   ```
-   The installer writes `supervisor.yaml`, registers the `collectorctrl-supervisor` systemd service, and starts it.
-3. Verify:
-   ```bash
-   sudo systemctl status collectorctrl-supervisor
-   ```
-
-#### Manual Configuration (Reference)
-
-The configuration file `/etc/collectorctrl/supervisor.yaml`:
-
-```yaml
-server:
-  endpoint: 'ws://YOUR_SERVER_IP:4320/v1/opamp'
-  token: 'your_secret_api_token'
-  tls:
-    insecure_skip_verify: true
-
-capabilities:
-  reports_effective_config: true
-  reports_own_metrics: true
-  reports_own_logs: true
-  reports_own_traces: true
-  reports_health: true
-  accepts_remote_config: true
-  reports_remote_config: true
-  accepts_restart_command: true
-  accepts_packages: true
-
-agent:
-  executable: '/usr/local/bin/otelcol'
-  passthrough_logs: true
-  config_files:
-    - '/etc/otelcol/config.yaml'
-
-storage:
-  directory: '/var/lib/collectorctrl/storage'
-
-telemetry:
-  logs:
-    level: info
-    output_paths:
-      - '/var/log/collectorctrl/supervisor.log'
-```
-
-> **Note:** Use `wss://` instead of `ws://` when your server terminates TLS for OpAMP, and set `tls.ca_file` to your CA certificate (e.g., `/etc/collectorctrl/certs/ca.pem`) with `insecure_skip_verify: false`.
-
-The systemd unit `/etc/systemd/system/collectorctrl-supervisor.service`:
-
-```ini
-[Unit]
-Description=CollectorCtrl Supervisor Agent
-After=network.target
-
-[Service]
-Type=simple
-User=root
-ExecStart=/usr/local/bin/collectorctrl-supervisor --config /etc/collectorctrl/supervisor.yaml
-Restart=always
-RestartSec=5
-LimitNOFILE=65536
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now collectorctrl-supervisor
-```
-
----
-
-## 3. Initial Configuration
-
-1. **Login**: Access the dashboard and authenticate with the default credentials:
-   - **Username**: `admin`
-   - **Password**: `admin`
-   - *⚠️ Change your password immediately after first login.*
-2. **Generate an API Token**: Navigate to **Settings → API Tokens** and generate a registration key for your Supervisor agents.
-3. **Verify Fleet**: Open the **Fleet Overview**. Your newly installed Supervisor should appear within 30 seconds.
-4. **Deploy Config**: Create a Fleet Policy to push your first OTel pipeline to the agent.
-
----
-
-## 4. Production HTTPS
-
-By default, CollectorCtrl listens on `http://localhost:4321`. For production HTTPS you have two options:
-
-### Option A: Reverse Proxy (Recommended)
-
-Terminate TLS on port 443 using **IIS**, **Nginx**, or **Caddy**, and forward traffic to `http://localhost:4321`. Example Nginx block:
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name collectorctrl.company.com;
-
-    ssl_certificate     /etc/letsencrypt/live/collectorctrl.company.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/collectorctrl.company.com/privkey.pem;
-
-    location / {
-        proxy_pass http://127.0.0.1:4321;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-### Option B: Native TLS
-
-Set the following environment variables on the CollectorCtrl service:
-
-| Variable | Purpose | Example |
-| :--- | :--- | :--- |
-| `COLLECTORCTRL_UI_HTTPS` | Enable native HTTPS | `true` |
-| `COLLECTORCTRL_UI_ADDR` | Bind address | `0.0.0.0:443` |
-| `COLLECTORCTRL_UI_CERT` | Certificate file path | `C:\ProgramData\CollectorCtrl\certs\server.crt` or `/etc/collectorctrl/certs/server.crt` |
-| `COLLECTORCTRL_UI_KEY` | Private key file path | `...\server.key` |
-
-**Windows** (registry, then restart the service):
-
-```powershell
-Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\CollectorCtrl" -Name Environment -Value "COLLECTORCTRL_UI_HTTPS=true","COLLECTORCTRL_UI_ADDR=0.0.0.0:443","COLLECTORCTRL_UI_CERT=C:\ProgramData\CollectorCtrl\certs\server.crt","COLLECTORCTRL_UI_KEY=C:\ProgramData\CollectorCtrl\certs\server.key" -Type MultiString
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\CollectorCtrl" -Name Environment -Type MultiString `
+  -Value "COLLECTORCTRL_UI_CERT=C:\ProgramData\CollectorCtrl\certs\server.crt","COLLECTORCTRL_UI_KEY=C:\ProgramData\CollectorCtrl\certs\server.key"
 Restart-Service CollectorCtrl
 ```
 
-**Linux** (systemd override):
+## Linux
+
+Any systemd-based distribution on amd64 or arm64. The PostgreSQL edition's installer supports `apt` (Ubuntu, Debian) and `yum`/`dnf` (RHEL family, Amazon Linux 2023).
 
 ```bash
-sudo systemctl edit collectorctrl
-# Add:
-# [Service]
-# Environment="COLLECTORCTRL_UI_HTTPS=true"
-# Environment="COLLECTORCTRL_UI_ADDR=0.0.0.0:443"
-# Environment="COLLECTORCTRL_UI_CERT=/etc/collectorctrl/certs/server.crt"
-# Environment="COLLECTORCTRL_UI_KEY=/etc/collectorctrl/certs/server.key"
-sudo systemctl daemon-reload
-sudo systemctl restart collectorctrl
+tar -xzf collectorctrl-server_<version>_linux_amd64.tar.gz
+sudo ./install.sh
 ```
 
+The installer copies the server and web assets to `/opt/collectorctrl-server`, installs the **`collectorctrl`** systemd service, and starts it. The installer in the `-postgres` archive also installs PostgreSQL with your package manager and creates the `collectorctrl` database and user.
+
+```bash
+sudo systemctl status collectorctrl
+sudo journalctl -u collectorctrl -f
+```
+
+### Recommended: production settings
+
+Keep settings in an environment file that only root and the service can read:
+
+```bash
+sudo mkdir -p /etc/collectorctrl /var/lib/collectorctrl
+sudo tee /etc/collectorctrl/server.env >/dev/null <<EOF
+COLLECTORCTRL_MODE=production
+COLLECTORCTRL_DATA_DIR=/var/lib/collectorctrl
+COLLECTORCTRL_JWT_SECRET=$(openssl rand -hex 32)
+COLLECTORCTRL_ENCRYPTION_KEY=$(openssl rand -hex 32)
+# PostgreSQL instead of SQLite:
+# COLLECTORCTRL_DB_TYPE=postgres
+# COLLECTORCTRL_DB_DSN=host=localhost port=5432 user=collectorctrl password=... dbname=collectorctrl sslmode=require
+EOF
+sudo chmod 600 /etc/collectorctrl/server.env
+
+sudo systemctl edit collectorctrl
+#   [Service]
+#   EnvironmentFile=/etc/collectorctrl/server.env
+
+sudo systemctl daemon-reload && sudo systemctl restart collectorctrl
+```
+
+In production mode the server refuses to start without `COLLECTORCTRL_JWT_SECRET` and `COLLECTORCTRL_ENCRYPTION_KEY`, and refuses plaintext listeners on non-loopback addresses. All settings: [Configuration reference](configuration.md).
+
+Open the firewall:
+
+```bash
+sudo ufw allow 4320/tcp && sudo ufw allow 4321/tcp                    # Ubuntu / Debian
+sudo firewall-cmd --permanent --add-port={4320,4321}/tcp && sudo firewall-cmd --reload   # RHEL family
+```
+
+## macOS
+
+Intel (amd64) or Apple silicon (arm64). macOS is best suited to evaluation and development.
+
+```bash
+mkdir collectorctrl-server && cd collectorctrl-server
+tar -xzf ../collectorctrl-server_<version>_darwin_arm64.tar.gz
+./collectorctrl-server
+```
+
+The data directory is the directory you start the server from, unless `COLLECTORCTRL_DATA_DIR` is set.
+
+## Kubernetes
+
+The server runs in Kubernetes as a **single replica** with a persistent volume mounted at `/var/lib/collectorctrl`, the container image above, ports 4320 and 4321, and HTTPS health probes on `/api/health`. Don't scale beyond one replica until high availability ships.
+
+Collectors running in Kubernetes are managed through the [CollectorCtrl Kubernetes Operator](https://github.com/CollectorCtrl/CollectorCtrl-K8s-Operator). The operator doesn't support per-agent enrollment yet, so a server that manages Kubernetes collectors needs `OPAMP_LEGACY_MODE=true` (shared-secret authentication). See [Security](security.md#agent-identity).
+
 ---
 
-## Dynamic Configuration Apply Mechanics
+## First sign-in
 
-When an administrator edits a configuration in the UI console and publishes the policy update, the following apply flow occurs:
-
-1. **Validation Check**: The server compiles the final YAML (resolving targets and merge rules) and executes a validation pass.
-2. **OpAMP Delivery**: The Supervisor receives the YAML payload over the OpAMP channel, merges it with any local configuration sources, and writes the effective config to disk.
-3. **Fast Supervised Restart**: When the effective configuration changes, the Supervisor signals and performs a fast restart of the collector process — with built-in self-healing that detects crash loops and automatically falls back to a known-good state.
-4. **Confirmation**: The Supervisor reports the applied configuration hash back to the server via OpAMP, closing the reconciliation loop.
+1. Open `https://<server>:4321`. Your browser warns about the certificate until you trust the server's CA. You can download it from `https://<server>:4321/api/onboard/ca.pem`; its SHA-256 fingerprint is printed in the server's start-up log.
+2. Sign in as **`admin` / `admin`** and choose a new password when prompted. To set the initial password instead, start the server for the first time with `COLLECTORCTRL_ADMIN_PASSWORD`.
+3. Go to **Get Started**, create an enrollment token, and [connect your first collector](agent-onboarding.md).
+4. Recommended next steps: configure [SSO](security.md#single-sign-on), create roles, set up [backups](upgrading.md#backup-and-restore), and connect the [Copilot](ai-copilot-and-mcp.md) to your model provider.
 
 ---
 
-## Log Directories & Troubleshooting Reference
+## Troubleshooting
 
-### 🏢 On Windows Server
-
-| Log | Path |
+| Symptom | What to check |
 | :--- | :--- |
-| Server Application Logs | `C:\ProgramData\CollectorCtrl\logs\server.log` |
-| Supervisor Service Logs | `C:\ProgramData\CollectorCtrlSupervisor\supervisor.log` |
-| OTel Collector Observations | `C:\ProgramData\CollectorCtrl\logs\otelcol-observations.log` |
+| Browser can't connect | Use **`https://`**, not `http://`. The UI is HTTPS by default. |
+| Server won't start: certificate / TLS error | The server refuses to start rather than fall back to plain HTTP. Check `COLLECTORCTRL_UI_CERT` / `COLLECTORCTRL_UI_KEY`, or that the data directory is writable so the server can create its CA. |
+| Server won't start in production mode | Set `COLLECTORCTRL_JWT_SECRET` and `COLLECTORCTRL_ENCRYPTION_KEY`. `COLLECTORCTRL_UI_TLS=plain` is refused on non-loopback addresses. |
+| Agents locked out after a container restart | The data volume wasn't persisted, so a new CA was created. Mount `/var/lib/collectorctrl` and re-enroll. |
+| Agent doesn't appear in Fleet | Port 4320 reachable from the host? Agent enrolled with a valid, unexpired token? Check **Notifications** for rejected or impersonation events. |
 
-### 🐧 On Linux Hosts
+Logs:
 
-| Log | Path / Command |
-| :--- | :--- |
-| Server Logs | `journalctl -u collectorctrl -f` |
-| Supervisor Logs | `/var/log/collectorctrl/supervisor.log` or `journalctl -u collectorctrl-supervisor -n 100 --no-pager` |
-| OTel Collector Observations | `/var/log/collectorctrl/otelcol-observations.log` |
-
-### Common Issues
-
-| Problem | Solution |
-| :--- | :--- |
-| Browser fails via `https://` | The console is plain HTTP by default — use `http://<server>:4321`, or enable TLS (see above) |
-| Agent not appearing | Verify the endpoint is `ws://<server>:4320/v1/opamp` and port 4320 is reachable |
-| TLS errors | If using self-signed certs, set `insecure_skip_verify: true` in `supervisor.yaml` |
-| Config not applying | Ensure the `otelcol` binary path in `supervisor.yaml` is correct |
-
----
-
-*For advanced troubleshooting, refer to the [Architecture Guide](architecture.md) or visit [collectorctrl.com/docs](https://collectorctrl.com/docs) for the full documentation suite.*
+| Platform | Server | Supervisor |
+| :--- | :--- | :--- |
+| Docker | `docker logs collectorctrl` | — |
+| Linux | `journalctl -u collectorctrl` | `journalctl -u collectorctrl-supervisor` |
+| Windows | Run `C:\Program Files\CollectorCtrl\server.exe` from an elevated prompt to see start-up errors | `%PROGRAMDATA%\CollectorCtrlSupervisor\supervisor.log` |

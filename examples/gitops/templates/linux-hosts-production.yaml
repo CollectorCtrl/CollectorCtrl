@@ -1,0 +1,54 @@
+# Example CollectorCtrl GitOps policy file.
+# Place it in the templates/ directory of the repository connected under
+# Settings > Git Integration. See docs/gitops.md for the full format.
+apiVersion: collectorctrl.io/v1alpha1
+kind: TelemetryPolicy
+metadata:
+  name: linux-hosts-production
+  description: Standard host metrics and syslog for production Linux hosts
+  priority: 10
+  target:
+    matchLabels:
+      os: linux
+    matchExpressions:
+      - key: collectorctrl.environment
+        operator: In
+        values: [production]
+spec:
+  collectorConfig:
+    extensions:
+      health_check: {}
+    receivers:
+      hostmetrics:
+        collection_interval: 30s
+        scrapers:
+          cpu: {}
+          memory: {}
+          disk: {}
+          filesystem: {}
+          network: {}
+          load: {}
+      filelog/syslog:
+        include: [/var/log/syslog, /var/log/messages]
+        start_at: end
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 80
+        spike_limit_percentage: 20
+      batch:
+        timeout: 5s
+    exporters:
+      otlp/gateway:
+        endpoint: "${env:OTLP_GATEWAY_ENDPOINT}"
+    service:
+      extensions: [health_check]
+      pipelines:
+        metrics:
+          receivers: [hostmetrics]
+          processors: [memory_limiter, batch]
+          exporters: [otlp/gateway]
+        logs:
+          receivers: [filelog/syslog]
+          processors: [memory_limiter, batch]
+          exporters: [otlp/gateway]

@@ -1,40 +1,39 @@
-# Security Policy
+# Security policy
 
-## Supported Versions
+## Supported versions
 
-We provide security updates for the following versions of CollectorCtrl:
+CollectorCtrl is in public beta. Security fixes are made in the **latest release** only, so please stay on the newest version.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.1.x   | :white_check_mark: |
-| < 1.1   | :x:                |
+| Version | Supported |
+| :--- | :--- |
+| Latest 0.5.x beta (currently v0.5.5-beta) | ✅ |
+| Earlier 0.5.x betas | ⚠️ Upgrade to the latest release |
+| 0.4.x and earlier | ❌ |
 
-## Reporting a Vulnerability
+Releases before v0.5.1-beta lack per-agent enrollment, per-install TLS and package signing. If you run one, upgrade: see [docs/upgrading.md](docs/upgrading.md).
 
-We take the security of CollectorCtrl seriously. If you believe you have found a security vulnerability, please report it to us privately.
+## Reporting a vulnerability
 
-**Please do not report security vulnerabilities through public GitHub issues, discussions, or pull requests.**
+**Please don't report security vulnerabilities in public GitHub issues, discussions or pull requests.**
 
-Instead, contact the CollectorCtrl security team at [connect@collectorctrl.com](mailto:connect@collectorctrl.com) with the subject line **"Security Vulnerability Report"**.
+Report them privately by email to [connect@collectorctrl.com](mailto:connect@collectorctrl.com) with the subject **"Security Vulnerability Report"**.
 
-### What to include
+Please include:
 
-- A description of the vulnerability and its potential impact.
-- Steps to reproduce or a proof-of-concept (if available).
-- Affected version(s) and deployment environment (Windows/Linux/Docker).
+- a description of the issue and its potential impact;
+- steps to reproduce or a proof of concept;
+- the affected version(s) and deployment (Windows, Linux, macOS, Docker, Kubernetes; SQLite or PostgreSQL).
 
-### What to expect
+What happens next:
 
-- We will acknowledge receipt of your report within **48 hours**.
-- We will provide an estimated timeframe for a fix and keep you informed of progress.
-- We will notify you once the vulnerability is patched and coordinate disclosure timing with you.
+- We acknowledge your report within **48 hours**.
+- We confirm the issue, agree on a timeline for a fix, and keep you informed.
+- We credit you in the release notes when the fix ships, unless you'd rather we didn't.
 
-## Security Practices
+## Verifying releases
 
-CollectorCtrl undergoes automated security scanning, including:
+Every release file has a detached Ed25519 signature. See [docs/verifying-downloads.md](docs/verifying-downloads.md).
 
-- **SAST:** GitHub CodeQL & `gosec` static analysis
-- **SCA:** Dependency monitoring via GitHub Dependency Graph and security advisories
-- **Integrity:** OpenSSF Scorecard
+## Security design
 
-For details on CollectorCtrl's security architecture (TLS, mTLS, RBAC, audit streaming), see [Security & Compliance](docs/security.md).
+Agent enrollment, TLS, RBAC, SSO, AI guardrails, package signing and the audit trail are described in [docs/security.md](docs/security.md).

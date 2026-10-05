@@ -1,99 +1,86 @@
-# CollectorCtrl: Technical Architecture
+# Architecture
 
-CollectorCtrl is an on-prem, enterprise-grade control plane designed for **high availability, zero-drift configuration management, and low-latency fleet governance** at global scale.
+CollectorCtrl is a self-hosted control plane for OpenTelemetry Collector fleets. It manages collectors; it never sits in the telemetry data path.
 
----
+```mermaid
+flowchart TB
+    People["People<br/>browser · SSO"] -- "HTTPS :4321" --> CP
+    Agents["AI agents<br/>MCP clients"] -- "HTTPS :4321 /api/mcp" --> CP
 
-## Component Overview
+    subgraph CP["CollectorCtrl Server · single binary"]
+        direction LR
+        A["Web UI · REST API · MCP<br/>AI Copilot"]
+        B["OpAMP gateway :4320<br/>Package repo · Onboarding"]
+        C["Git sync · Rollouts · Watchdogs<br/>Telemetry Governor · Audit"]
+    end
 
-### 1. Management Server (Main Control Plane)
+    CP --- DB[("SQLite / PostgreSQL")]
+    CP --- DATA[("Data directory<br/>CA · keys · secrets · packages")]
+    CP -. "your approved model" .-> LLM["LLM provider or<br/>self-hosted model"]
+    CP <-. "HTTPS" .-> GH["GitHub / GitHub Enterprise"]
+    CP -. "OTLP audit stream" .-> SIEM["SIEM"]
 
-The **Management Server** is the heart of the platform. It is deployed on-premise or within your private cloud and exposes:
+    subgraph H["Each managed host"]
+        SUP["Supervisor"] --> MAIN["Main collector"]
+        SUP -.-> SIDE["Sidecar collector"]
+        SUP -.-> APPS["Instrumented apps"]
+    end
+    SUP == "OpAMP · WSS · per-agent credential<br/>HTTPS · signed packages" ==> CP
+    MAIN -- "telemetry" --> BE["Any backend"]
+```
 
-- **Admin UI Console**: A modern, secure, web-based dashboard for administration, policy design, fleet visualization, and configuration management.
-- **REST API & SDKs**: Full programmatic access to manage configurations, query agent state, trigger rollouts, and sync package assets.
-- **OpAMP Gateway**: A high-performance WebSocket endpoint executing the OpenTelemetry Agent Management Protocol (OpAMP) — the core control channel for all active Supervisor connections.
-- **Metadata Database**: Tracks fleet state, users, roles, audit trails, and versioned policy history.
-  - **SQLite** (Standard): Zero-config, single-file database for developer/sandbox deployments and small fleets (< 50 agents).
-  - **PostgreSQL** (Production): High-concurrency database engine required for production fleets.
+## Components
 
-### 2. Supervisor Agent (The "Manager")
+### Server
 
-The **Supervisor** is an extremely lightweight, OS-native daemon deployed alongside the OTel Collector on each target node. It runs as a **Windows Service** or **Linux systemd unit**. Its primary responsibilities:
+A single Go binary that embeds the web UI and serves:
 
-- **Process Lifecycle Management**: Spawns, monitors, and automatically restarts the OTel Collector process if it crashes or stalls.
-- **OpAMP Client Connection**: Maintains a secure, persistent, bidirectional WebSocket channel to the Management Server.
-- **Active Reconciler**: Pulls assigned configurations from the control plane, writes the effective configuration to disk, and applies it with a fast, supervised collector restart — including crash-loop detection and automatic fallback to a known-good state.
-- **Drift Reconciliation**: Reports the effective configuration hash to the server with every heartbeat; when the server detects divergence from the governed policy, it reconciles the agent (alert-only or auto-remediate, per policy).
+- the **web UI** and **REST API** (port 4321, HTTPS), including onboarding scripts, the server CA and package downloads for supervisors;
+- the **MCP endpoint** (`/api/mcp`) for AI clients;
+- the **OpAMP gateway** (port 4320, WSS) that every supervisor connects to;
+- background services: Git sync, canary and rollout state, upgrade governor and watchdogs, notifications, SIEM audit streaming, Telemetry Governor analytics.
 
-### 3. OpenTelemetry Collector (The "Worker")
+State lives in **SQLite** (default) or **PostgreSQL**, plus a **data directory** that holds the per-install CA, private keys and secrets (see [Configuration](configuration.md#data-directory)). Run **one server instance**: multi-replica high availability is on the roadmap.
 
-The **Collector** is the actual OpenTelemetry Collector binary execution process managed by the Supervisor as a child worker. This can be:
+### Supervisor
 
-- The upstream **OTel Core** or **OTel Contrib** distribution
-- A vendor-supported binary (e.g., Coralogix, Dynatrace, Datadog Agent)
-- A custom-compiled binary created via the CollectorCtrl **Custom Builder**
+A small OS-native agent on each host: a Windows service, systemd unit or launchd daemon. It:
 
----
+- keeps a persistent, authenticated OpAMP connection to the server (outbound only);
+- starts, stops and restarts the **main** collector and an optional **sidecar** collector, independently;
+- **validates every new configuration** with the collector before applying it, and rolls back to the last known good config if a new one crash-loops the collector;
+- reports health, effective configuration and its hash, component details and attributes;
+- installs **signed** collector and supervisor packages, with a connection watchdog that rolls back a supervisor upgrade that can't reconnect;
+- optionally discovers and instruments applications (ZeroTouch).
 
-## Data Flow & Protocol
+The Supervisor keeps running, and stays reachable, when the collector crashes.
 
-### OpAMP Protocol
+### Collector
 
-CollectorCtrl uses the **Open Agent Management Protocol (OpAMP)** to ensure standardized, bidirectional communication between the Management Server and all Supervisor agents.
+Any OpenTelemetry Collector binary: upstream `otelcol` / `otelcol-contrib`, a vendor distribution, or a build from the integrated Custom Builder (`ocb`).
 
-- **Agent → Server (Heartbeats)**: Agents send periodic health reports and current configuration hashes. The server compares hashes to detect drift and initiates reconciliation if needed.
-- **Server → Agent (Policy Push)**: The server pushes new configuration payloads, upgrade instructions, or control commands (Restart/Start/Stop) over the WebSocket channel.
-- **Agent → Server (Effective Config)**: Agents report their effective (applied) configuration after a successful reload, confirming the policy is active.
+## Configuration flow
 
-### Dynamic Configuration Apply Flow
+1. A change is made in the UI, through the API or MCP (after approval), or merged in Git.
+2. The server resolves which collectors it applies to (policy selectors, overrides, canary cohort), validates the YAML, stores the new version with its SHA-256 and history, and writes an audit entry.
+3. The configuration is sent to each matching supervisor over OpAMP. Offline collectors receive it when they reconnect.
+4. The supervisor merges it with local configuration sources, has the collector validate it, then restarts only the pipeline whose configuration changed (main or sidecar).
+5. The supervisor reports the applied hash back. The server marks the change delivered and confirmed, or failed with the collector's error.
+6. From then on, every heartbeat carries the effective config hash. A difference is reported as **drift** and, per policy, reverted.
 
-When an administrator publishes a policy update from the UI console:
+## Agent identity and transport
 
-1. **Validation Check**: The server compiles the final YAML (resolving target selectors and merge rules) and executes a validation pass.
-2. **File Writing**: The Supervisor receives the YAML payload over the OpAMP channel, merges it with local configuration sources, and writes the effective configuration to disk.
-3. **Apply**: On configuration change, the Supervisor performs a fast, supervised restart of the collector process — with crash-loop detection and automatic fallback to a known-good state.
-4. **Confirmation**: The Supervisor reports the applied configuration hash back to the server, closing the reconciliation loop.
+- The server creates its own **CA** on first start and serves TLS on both ports. Supervisors pin the CA's SHA-256 fingerprint at enrollment.
+- Each supervisor enrolls once with a short-lived **enrollment token** and receives a **per-agent credential** bound to its instance UID. Later connections authenticate with that credential, and a connection can't act as another instance.
+- Telemetry Governor taps get per-agent tap tokens issued by the server over OpAMP.
 
----
+More detail: [Security](security.md).
 
-## Network Requirements (Firewall)
+## Ports
 
-| Port | Protocol | Direction | Description |
-| :--- | :--- | :--- | :--- |
-| **4320** | TCP / WS (WSS with TLS) | Inbound to Server | **OpAMP Gateway**: Core WebSocket control channel for active Supervisor agents |
-| **4321** | TCP / HTTP (HTTPS with TLS) | Inbound to Server | **Dashboard Console**: Exposes the Admin UI and REST API |
-| **13133** | TCP | Localhost only | **OTel Health Check**: Used by the Supervisor to check Collector process health |
-| **5432** | TCP | Outbound from Server | **PostgreSQL Store**: Database connection (if using Postgres) |
-
-> *Note: The Supervisor Agent connects **outbound** to the Server on port 4320. No inbound ports need to be opened on the agent machines themselves.*
-
----
-
-## Scalability & Production Datastores
-
-Developer trials run out-of-the-box using an embedded **SQLite** database. Production deployments must use **PostgreSQL** for high-concurrency workloads.
-
-### PostgreSQL Sizing Guidelines
-
-| Fleet Size (Active Agents) | Recommended CPU (vCPUs) | Recommended RAM (GB) | Storage Engine IOPS |
-| :--- | :--- | :--- | :--- |
-| **Developer / Sandbox** (< 50) | 2 | 4 | 500 (General SSD) |
-| **Mid-Scale Enterprise** (50 – 1,000) | 4 | 8 | 3,000 (Provisioned) |
-| **Global Infrastructure** (1,000 – 10,000+) | 8 – 16 | 16 – 32 | 10,000+ (High Performance) |
-
-*For larger environments exceeding 10,000 concurrent supervisors, configure read replicas to offload API query operations and reporting analytics.*
-
----
-
-## Security Model
-
-- **HTTP/WS by Default**: For local evaluation and trusted networks, the console runs on plain HTTP (`:4321`) and agents connect over `ws://` (`:4320`).
-- **Production TLS**: Terminate TLS with a reverse proxy (IIS / Nginx / Caddy, recommended) or enable native HTTPS via `COLLECTORCTRL_UI_HTTPS` with certificate/key environment variables. Minimum supported version: **TLS 1.2** (TLS 1.3 recommended).
-- **Mutual TLS (mTLS)**: Agents can be provisioned with unique client certificates for strong, hardware-rooted authentication — preventing spoofing.
-- **JWT Auth**: User sessions in the Admin UI are secured via JSON Web Tokens (JWT).
-- **OIDC / SSO**: Integrate with Microsoft Entra ID (Azure AD), Okta, Auth0, or any OIDC-compliant identity provider.
-
----
-
-*The architecture is designed to be "Supervisor-first": the Supervisor remains running and manageable even if the OTel Collector binary crashes. The Supervisor restarts the Collector automatically and maintains its OpAMP connection to the Management Server throughout.*
+| Port | Direction | Purpose |
+| :--- | :--- | :--- |
+| 4320 | Inbound to server | OpAMP gateway (WSS) |
+| 4321 | Inbound to server | UI, REST API, MCP, onboarding, package downloads (HTTPS) |
+| 5432 | Server to database | PostgreSQL, if used |
+| 13133 | Local on each host | Collector health check |

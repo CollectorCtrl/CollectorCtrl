@@ -27,6 +27,8 @@ A file verifies only if its SHA-256 matches the `sha256` field **and** the signa
 | v0.5.2-beta | `1bff4168b179adce0781b93dbf3ef115de821e9bf65a6152af24dbc10c9d8f78` |
 | v0.5.1-beta | `7202077ce0fc6670d1db81b955c9becfb509a2813ae68b606706e15a3f07c17b` |
 
+`cd8f932e…` is the **long-term release key** from v0.5.3-beta on. If it ever has to change, the new key will be announced in advance, and releases will trust both keys during the changeover.
+
 Compare the key with a copy from a second channel you trust (for example [collectorctrl.com](https://collectorctrl.com)) before relying on it. A signature checked only against a key downloaded from the same place as the file proves little.
 
 ## Verify with the script in this repository

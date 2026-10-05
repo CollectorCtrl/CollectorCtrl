@@ -151,7 +151,9 @@ REST API: the OpenAPI specification for the current release is in [docs/api/open
 
 ## License
 
-CollectorCtrl is free to use. See [LICENSE](LICENSE) and [NOTICE](NOTICE). CollectorCtrl includes software developed by The OpenTelemetry Authors.
+CollectorCtrl is **free to use**, including in production and for commercial monitoring, under the [CollectorCtrl Free-to-Use Software License](LICENSE). It's proprietary freeware, not open source: you may not modify or redistribute the binaries, or offer CollectorCtrl as a paid managed service without written permission.
+
+CollectorCtrl includes software derived from OpenTelemetry OpAMP Go, by The OpenTelemetry Authors, used under the Apache License 2.0. See [NOTICE](NOTICE).
 
 ---
 

@@ -4,6 +4,12 @@ A summary of every CollectorCtrl release. Full notes, downloads and signatures f
 
 ⚠️ marks releases with breaking changes.
 
+## 0.6.x: Kubernetes fleet visibility
+
+| Version | Date | Highlights |
+| :--- | :--- | :--- |
+| [v0.6.0-beta](https://github.com/CollectorCtrl/CollectorCtrl/releases/tag/v0.6.0-beta) | 2026-10-09 | **Kubernetes workload observation (pilot):** see collector Deployments, DaemonSets and StatefulSets deployed by your own Helm/GitOps next to host collectors, via the [K8s observer](https://github.com/CollectorCtrl/CollectorCtrl-K8s-Operator); All / Host collectors / Kubernetes workloads views with cluster and namespace filters; pod lifecycle and explicit observation freshness; Kubernetes-aware Copilot and MCP; observed workloads excluded from host policies, canaries, upgrades and host-only actions; inventory scans no longer truncated. ⚠️ Observer now enrolls with an Agent Enrollment token, needs a retained credential volume and one replica; upgrade server and observer together. |
+
 ## 0.5.x: GA hardening
 
 | Version | Date | Highlights |

@@ -49,7 +49,7 @@ Useful script options:
 | `--ca-sha256` / `-f` | `-CaSha256` | Pin the server CA's SHA-256 fingerprint |
 | `--otelcol-binary` / `-b` | `-OtelBin` | Collector executable |
 | `--otelcol-config` / `-c` | `-OtelConfig` | Initial collector config file |
-| `--version` / `-v` | `-Version` | Supervisor version to install, e.g. `0.5.5-beta` (default: the newest release) |
+| `--version` / `-v` | `-Version` | Supervisor version to install, e.g. `0.6.3-beta` (default: the newest release) |
 | `--insecure-skip-verify` | `-InsecureSkipVerify` | Skip certificate verification. **Testing only.** |
 
 > If the server sits behind NAT, a load balancer or Kubernetes, set `COLLECTORCTRL_ADVERTISE_HOST` or `COLLECTORCTRL_OPAMP_ENDPOINT` on the server so the generated commands use an address the hosts can reach. See [Configuration](configuration.md#network-and-urls).

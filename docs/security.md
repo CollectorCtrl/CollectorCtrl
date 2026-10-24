@@ -31,7 +31,7 @@ CollectorCtrl controls what runs on every host in your fleet, so a default insta
 - After enrollment the identity is **locked**: a wrong credential, a second enrollment or a shared-secret login for that UID is refused and raises a **Possible agent impersonation** notification.
 - **Revoke** disconnects an agent and permanently blocks its UID. **Allow re-enroll** brings back a rebuilt host with its history.
 - Onboarding scripts **pin the server CA by fingerprint** and abort on a mismatch.
-- **Legacy mode** (`OPAMP_LEGACY_MODE=true`) also accepts a fleet-wide shared secret. It's off by default and meant only as a migration window, and it's currently needed for collectors managed by the Kubernetes operator. Upgraded supervisors that connect in legacy mode are migrated to their own credential automatically.
+- **Legacy mode** (`OPAMP_LEGACY_MODE=true`) also accepts a fleet-wide shared secret. It's off by default and meant only as a migration window, for example for a Kubernetes observer installed before v0.6.0 that hasn't moved to enrollment yet. Upgraded supervisors that connect in legacy mode are migrated to their own credential automatically.
 
 ## User authentication
 

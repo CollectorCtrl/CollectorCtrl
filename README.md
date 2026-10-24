@@ -18,7 +18,7 @@ Deploy, configure, govern and upgrade your entire OpenTelemetry Collector fleet 
 
 ---
 
-> **Public beta.** The current release is **v0.5.5-beta** (1 October 2026). CollectorCtrl is free to use and self-hosted. Betas can include breaking changes: read the [release notes](RELEASE_NOTES.md) before upgrading, and see [what's stable](#feature-maturity) before planning production use.
+> **Public beta.** The current release is **v0.6.3-beta** (23 October 2026). CollectorCtrl is free to use and self-hosted. Betas can include breaking changes: read the [release notes](RELEASE_NOTES.md) before upgrading, and see [what's stable](#feature-maturity) before planning production use.
 
 ## Why CollectorCtrl
 
@@ -32,18 +32,20 @@ OpenTelemetry made the data plane vendor-neutral. The fleet that runs it usually
 
 | | |
 | :--- | :--- |
-| **Fleet management over OpAMP** | Live inventory of every collector on Windows, Linux, macOS and containers: health, version, effective config, attributes. Table, honeycomb and topology views. |
+| **Fleet management over OpAMP** | Live inventory of every collector on Windows, Linux, macOS and containers: health, version, effective config, attributes. Table, honeycomb and topology views, classified by environment and role. |
+| **Kubernetes workloads** *(pilot)* | See the collector Deployments, DaemonSets and StatefulSets you deploy with Helm or GitOps next to host collectors, read-only, via the [Kubernetes observer](https://github.com/CollectorCtrl/CollectorCtrl-K8s-Operator). |
 | **Policy-driven configuration** | Label-selector policies, SHA-256-versioned configs, canary rollouts with promote and abort, one-click rollback, full configuration history with diffs. |
 | **Drift prevention** | Each agent reports its effective config hash. Drift is flagged or reverted automatically, per policy. |
 | **Self-healing collectors** | Every new config is validated by the collector before it's applied. A config that crash-loops the collector is rolled back to the last known good one. |
 | **GitOps** | Keep policies in GitHub or GitHub Enterprise. Changes arrive as pull requests, sync within seconds via webhook, and drift is shown side by side. |
 | **AI Copilot** | Answers from live fleet data, streams its reasoning steps, and proposes changes with a diff and blast radius. **It never applies a change on its own.** A person approves every one. |
-| **MCP server** | 60+ governed tools and 4 runbook prompts for Claude Desktop, Cursor or any MCP client. Same RBAC, audit and approval workflow as the UI. |
+| **MCP server** | 60+ governed tools and 5 runbook prompts for Claude Desktop, Cursor or any MCP client. Same RBAC, audit and approval workflow as the UI. |
 | **Sidecar pipelines** | Run a second, isolated collector beside the main one, for example to keep a SIEM pipeline running while you change the observability pipeline. |
 | **Supervisor and collector lifecycle** | Signed package repository, fleet-wide supervisor and collector upgrades with watchdogs and automatic rollback, and an integrated Custom Builder (`ocb`). |
 | **ZeroTouch instrumentation** *(alpha)* | Discover applications on managed hosts and attach OpenTelemetry agents (Java, .NET, Node.js, Python) from the UI, with canary rollout and centrally managed agent versions. |
-| **Telemetry Governor** | Edge taps that keep 100% of errors and sample the rest, fan out to S3 or OTLP destinations, and generate filter rules to cut ingest cost. |
-| **Enterprise security** | Per-agent enrollment and credentials, TLS by default with a per-install CA, OIDC SSO, granular RBAC, tamper-evident audit trail streamed to your SIEM over OTLP. |
+| **Telemetry Governor** | Edge taps sample telemetry at the collector, Insights ranks the recurring patterns behind your volume, and the optimizer turns them into validated filter or sampling rules rolled out by policy. Fan out to S3 or OTLP destinations. |
+| **Enterprise security** | Per-agent enrollment and credentials, TLS by default with a per-install CA, OIDC SSO, granular RBAC with environment-scoped tokens, tamper-evident audit trail streamed to your SIEM over OTLP. |
+| **Alerting by environment** | Notifications filtered per environment, and alert channels (email, Slack, Microsoft Teams, PagerDuty, webhooks) routed by environment, with one summary alert instead of hundreds during an outage. |
 
 See [docs/features.md](docs/features.md) for the full capability list.
 
@@ -110,9 +112,9 @@ More detail: [docs/architecture.md](docs/architecture.md).
 | Linux (amd64, arm64) | ✅ | ✅ | `.tar.gz` with `install.sh` and a systemd unit |
 | macOS (amd64, arm64) | ✅ | ✅ | `.tar.gz` |
 | Docker | ✅ | — | `ghcr.io/collectorctrl/collectorctrl-server` |
-| Kubernetes | Single replica | Via the [K8s operator](https://github.com/CollectorCtrl/CollectorCtrl-K8s-Operator) | See [setup notes](docs/setup.md#kubernetes) |
+| Kubernetes | Single replica | Observation pilot via the [K8s observer](https://github.com/CollectorCtrl/CollectorCtrl-K8s-Operator) | See [setup notes](docs/setup.md#kubernetes) |
 
-Every release file has a detached `.sig` signature. See [Verifying downloads](docs/verifying-downloads.md).
+Every release file has a detached `.sig` signature, and server and supervisor binaries have an SPDX SBOM (`.spdx.json`). See [Verifying downloads](docs/verifying-downloads.md).
 
 ## Feature maturity
 
@@ -120,7 +122,8 @@ Every release file has a detached `.sig` signature. See [Verifying downloads](do
 | :--- | :--- |
 | **Beta** | Fleet management, policies and canary rollouts, drift prevention, configuration history, GitOps, sidecar collectors, supervisor and collector upgrades, package signing, Custom Builder, AI Copilot, MCP server, Telemetry Governor, SSO and RBAC, audit and SIEM streaming |
 | **Alpha** | ZeroTouch instrumentation |
-| **Not yet available** | Multi-replica high availability (run a single server), enrollment-based auth for the Kubernetes operator |
+| **Pilot** | Kubernetes workload observation (read-only) |
+| **Not yet available** | Multi-replica high availability (run a single server), managing Kubernetes workload configuration from CollectorCtrl |
 
 CollectorCtrl has been load-tested with up to 1,000 collectors on a single server. If you plan a larger fleet, [get in touch](mailto:connect@collectorctrl.com).
 
@@ -131,13 +134,13 @@ CollectorCtrl has been load-tested with up to 1,000 collectors on a single serve
 | [Installation](docs/setup.md) | Docker, Compose, Windows, Linux, macOS, Kubernetes notes, first sign-in |
 | [Connecting collectors](docs/agent-onboarding.md) | Enrollment, the Supervisor, `supervisor.yaml`, sidecars, vendor collectors |
 | [Configuration reference](docs/configuration.md) | Environment variables, TLS modes, data directory, ports |
-| [Upgrading, backup and restore](docs/upgrading.md) | Upgrade checklist, breaking changes in 0.5.x, backup/restore |
+| [Upgrading, backup and restore](docs/upgrading.md) | Upgrade checklist, breaking changes in 0.5.x and 0.6.x, backup/restore |
 | [Features](docs/features.md) | Everything CollectorCtrl does today |
 | [AI Copilot and MCP](docs/ai-copilot-and-mcp.md) | Model providers, approvals, MCP tools, connecting Claude Desktop or Cursor |
 | [GitOps](docs/gitops.md) | Managing fleet policies in a GitHub repository |
 | [Architecture](docs/architecture.md) | Components, protocols, data flow |
 | [Security](docs/security.md) | Identity, TLS, RBAC, audit, package signing |
-| [Verifying downloads](docs/verifying-downloads.md) | Checking release signatures |
+| [Verifying downloads](docs/verifying-downloads.md) | Checking release signatures and SBOMs |
 | [Release notes](RELEASE_NOTES.md) · [Changelog](CHANGELOG.md) | What changed, release by release |
 
 REST API: the OpenAPI specification for the current release is in [docs/api/openapi.json](docs/api/openapi.json), and every server serves its own copy at `/api/docs/openapi.json`.

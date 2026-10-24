@@ -85,4 +85,4 @@ You can load the SBOMs into tools such as Dependency-Track, Grype or Trivy to ch
 grype sbom:collectorctrl-server_0.6.3-beta_linux_amd64.tar.gz.spdx.json
 ```
 
-The Windows installers (`*-setup_*.exe` and the server `.exe` installers) contain the same Go binaries as the archives for the same version. SBOMs for the web UI's JavaScript dependencies and for the Docker image will follow in a later release.
+The Windows installers (the server `.exe` files and `collectorctrl-supervisor-setup_*.exe`) don't have their own SBOM yet. SBOMs for the installers, the web UI's JavaScript dependencies and the Docker image will follow in a later release.

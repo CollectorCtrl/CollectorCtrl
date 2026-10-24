@@ -59,6 +59,10 @@ The Supervisor keeps running, and stays reachable, when the collector crashes.
 
 Any OpenTelemetry Collector binary: upstream `otelcol` / `otelcol-contrib`, a vendor distribution, or a build from the integrated Custom Builder (`ocb`).
 
+### Kubernetes observer (pilot)
+
+An optional component for clusters, run as a single replica: the [Kubernetes observer](https://github.com/CollectorCtrl/CollectorCtrl-K8s-Operator). It watches collector Deployments, DaemonSets and StatefulSets and reports their identity, observed configuration and pods to the server over OpAMP, using enrolled credentials it keeps on persistent storage. It is read-only: deployments and configuration stay with your Helm charts, GitOps or CI/CD.
+
 ## Configuration flow
 
 1. A change is made in the UI, through the API or MCP (after approval), or merged in Git.

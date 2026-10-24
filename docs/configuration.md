@@ -114,7 +114,7 @@ Generate values with `openssl rand -hex 32`.
 
 | Variable | Default | Description |
 | :--- | :--- | :--- |
-| `OPAMP_LEGACY_MODE` | `false` | Also accept agents that authenticate with the shared secret instead of a per-agent credential. Use it only as a migration window when upgrading from 0.5.0 or earlier, or for Kubernetes operator-managed collectors. Upgraded supervisors that connect this way are migrated to their own credential automatically. |
+| `OPAMP_LEGACY_MODE` | `false` | Also accept agents that authenticate with the shared secret instead of a per-agent credential. Use it only as a migration window when upgrading from 0.5.0 or earlier, or for a Kubernetes observer installed before v0.6.0 that hasn't moved to enrollment yet. Upgraded supervisors that connect this way are migrated to their own credential automatically. |
 
 ## Single sign-on bootstrap
 

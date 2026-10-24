@@ -18,7 +18,7 @@ This guide installs the **CollectorCtrl Server**. To connect hosts afterwards, s
 
 ### Release files
 
-Download from the [latest release](https://github.com/CollectorCtrl/CollectorCtrl/releases). Replace `<version>` below with the release version, for example `0.5.5-beta`.
+Download from the [latest release](https://github.com/CollectorCtrl/CollectorCtrl/releases). Replace `<version>` below with the release version, for example `0.6.3-beta`.
 
 | Platform | Server | Supervisor (for managed hosts) |
 | :--- | :--- | :--- |
@@ -195,7 +195,16 @@ The data directory is the directory you start the server from, unless `COLLECTOR
 
 The server runs in Kubernetes as a **single replica** with a persistent volume mounted at `/var/lib/collectorctrl`, the container image above, ports 4320 and 4321, and HTTPS health probes on `/api/health`. Don't scale beyond one replica until high availability ships.
 
-Collectors running in Kubernetes are managed through the [CollectorCtrl Kubernetes Operator](https://github.com/CollectorCtrl/CollectorCtrl-K8s-Operator). The operator doesn't support per-agent enrollment yet, so a server that manages Kubernetes collectors needs `OPAMP_LEGACY_MODE=true` (shared-secret authentication). See [Security](security.md#agent-identity).
+Collectors that run in Kubernetes can be **observed** (pilot, since v0.6.0) with the [CollectorCtrl Kubernetes observer](https://github.com/CollectorCtrl/CollectorCtrl-K8s-Operator). It shows collector Deployments, DaemonSets and StatefulSets deployed by your own Helm charts or GitOps next to host collectors. Changes to those workloads stay with your deployment system.
+
+The observer enrolls like a supervisor:
+
+1. Create an enrollment token under **Settings → API Tokens → Agent Enrollment**, store it in a Secret in the observer's namespace under `enrollment-token`, and reference it with `opamp.enrollmentSecret`.
+2. Give it persistent credential storage (the chart creates a retained PVC, or set `credentialStorage.existingClaim`) and keep that storage across upgrades.
+3. Run **one** observer replica.
+4. Set the server's WSS endpoint with `opamp.server`, and `opampCAConfigMap` if the server uses a private CA.
+
+Installations that still use the shared secret need `OPAMP_LEGACY_MODE=true` only until they move to enrollment. See [Security](security.md#agent-identity) and [Upgrading](upgrading.md#changes-to-check-in-06x).
 
 ---
 

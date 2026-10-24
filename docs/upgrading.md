@@ -5,6 +5,7 @@
 - [Upgrading supervisors and collectors](#upgrading-supervisors-and-collectors)
 - [Upgrading from 0.5.0 or earlier](#upgrading-from-050-or-earlier)
 - [Changes to check in 0.5.2 – 0.5.5](#changes-to-check-in-052--055)
+- [Changes to check in 0.6.x](#changes-to-check-in-06x)
 - [Backup and restore](#backup-and-restore)
 
 CollectorCtrl is in public beta, and betas can contain breaking changes. Read the [release notes](../RELEASE_NOTES.md) for every version you skip.
@@ -75,6 +76,16 @@ What changed:
 The full list is in each release's notes on the [Releases](https://github.com/CollectorCtrl/CollectorCtrl/releases) page.
 
 ---
+
+## Changes to check in 0.6.x
+
+- **Kubernetes observer (0.6.0).** The observer now enrolls with an **Agent Enrollment** token stored in a Secret (`opamp.enrollmentSecret`), needs retained credential storage, and runs as **one** replica. Upgrade the server and the observer together. Installations that used the shared secret follow the legacy migration path before you turn `OPAMP_LEGACY_MODE` off. See [Kubernetes](setup.md#kubernetes).
+- **Telemetry Governor sampling (0.6.2).** Taps now sample every severity at one rate, including warnings and errors, and the default rate for new taps is **10%**. Existing taps keep their rate. Hosts switch over when their supervisor is upgraded, so until the whole fleet is upgraded, older hosts still send all errors and their errors look inflated in Insights. The S3 archive and OTLP destinations now receive a sample of errors, not every error.
+- **Governor API (0.6.2).** `GET /api/governor/insights/overview` returns received counts only; the `estimated*`, `sampling_rate` and error/byte total fields are gone. Pattern endpoints no longer return estimated counts. A scope with more than 10,000 distinct patterns returns `422`.
+- **Onboarding commands (0.6.3).** Generate new commands in **Get Started**: commands copied before 0.6.3 don't verify the server's CA before downloading. Windows hosts need `curl.exe`, which current Windows versions include.
+- **Alerts (0.6.3).** Disconnect and config-rejection alerts may arrive a few seconds later and, above 5 in an environment, are grouped into one summary. Alert rules that match the exact title "Collector Disconnected: …" or "Config Rejection: …" won't match a summary.
+- **Environments (0.6.3).** Environment names are no longer case-sensitive: a token limited to `prod` also sees collectors classified as `Prod`. Review scoped tokens if you used capitalization to separate environments. Unclassified hosts and applications report `unknown` instead of `default`; Telemetry Governor S3 archive paths still use `environment=default`.
+- **Older notifications (0.6.3)** have no environment and show as Fleet-wide.
 
 ## Backup and restore
 

@@ -40,8 +40,8 @@ pip install cryptography
 curl -fsSLO https://raw.githubusercontent.com/CollectorCtrl/CollectorCtrl/main/scripts/verify-release.py
 
 # Download the file and its .sig into the same folder, then:
-python3 verify-release.py collectorctrl-supervisor_0.5.5-beta_linux_amd64.tar.gz
-# OK    collectorctrl-supervisor_0.5.5-beta_linux_amd64.tar.gz  (sha256 adf91d37…)
+python3 verify-release.py collectorctrl-supervisor_0.6.3-beta_linux_amd64.tar.gz
+# OK    collectorctrl-supervisor_0.6.3-beta_linux_amd64.tar.gz  (sha256 e1ab9efa…)
 ```
 
 The script uses the current release key by default. For older releases pass the matching key: `--key <hex>`.
@@ -49,7 +49,7 @@ The script uses the current release key by default. For older releases pass the 
 ## Verify with OpenSSL 3
 
 ```bash
-F=collectorctrl-supervisor_0.5.5-beta_linux_amd64.tar.gz
+F=collectorctrl-supervisor_0.6.3-beta_linux_amd64.tar.gz
 KEY=cd8f932ebfd0e38a37e1235f4e7a61cb5dd6d8630b6f425b33fbbcf5880c5cde
 
 # 1. The file must match the signed digest

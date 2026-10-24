@@ -11,6 +11,11 @@
         "description": "Session JWT or cc_ API token",
         "scheme": "bearer",
         "type": "http"
+      },
+      "governorSourceToken": {
+        "description": "Ingest-only ccg_ source token; source identity comes from the credential. Do not combine with agent_id or host tap credentials.",
+        "scheme": "bearer",
+        "type": "http"
       }
     }
   },
@@ -3267,6 +3272,57 @@
         ]
       }
     },
+    "/api/fleet/topology": {
+      "get": {
+        "description": "Environment authorization is applied before config parsing. Application nodes require discovery:analyze in addition to fleet:view; otherwise discovery_status is forbidden. Edges describe reported or last queued configuration, never observed traffic. Unresolved, ambiguous and external destinations are explicit. No raw configuration or credentials are returned.",
+        "operationId": "get_api_fleet_topology",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "env",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read configuration-based fleet topology with active pipelines and explicit routing evidence",
+        "tags": [
+          "fleet"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "fleet:view"
+        ]
+      }
+    },
     "/api/generate_tool_config": {
       "post": {
         "description": "",
@@ -3899,7 +3955,7 @@
     },
     "/api/governor/analytics/generate-filter": {
       "post": {
-        "description": "",
+        "description": "Generates an optimizer rule (processors only, never pipeline replacements) and measures it on stored samples with the same conditions the rule uses. Scope query parameters (period, env, source_id, source_kind, service, cluster, namespace, region, function) select the samples; default period 24h. The response includes preview (analyzed, matched, protected, expected removed, bytes; insufficient_data when there are no samples), compatibility_status/compatibility_note from CollectorCtrl's real-collector replay tests, and steps. enable_ai_validation=true adds advisory AI notes (slower); AI never changes the YAML.",
         "operationId": "post_api_governor_analytics_generate_filter",
         "requestBody": {
           "content": {
@@ -4892,6 +4948,88 @@
         ]
       }
     },
+    "/api/governor/facets": {
+      "get": {
+        "description": "",
+        "operationId": "get_api_governor_facets",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Governor facets",
+        "tags": [
+          "governor"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "governor:view"
+        ]
+      }
+    },
+    "/api/governor/insights/overview": {
+      "get": {
+        "description": "Projected volume, approximate payload bytes, errors and a 24-bucket timeline for the selected scope, broken down by source. Host-tap samples are extrapolated with each host's tap sampling rate; external sources are reported as received. Accepts the same scope parameters as /api/governor/samples (signal, period, env, source_id, source_kind, service, cluster, namespace, region, function).",
+        "operationId": "get_api_governor_insights_overview",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Governor insights overview",
+        "tags": [
+          "governor"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "governor:view"
+        ]
+      }
+    },
     "/api/governor/s3-config": {
       "get": {
         "description": "",
@@ -5286,6 +5424,553 @@
         "x-auth": "bearer",
         "x-permissions-any": [
           "governor:view"
+        ]
+      }
+    },
+    "/api/governor/source-breakdown": {
+      "get": {
+        "description": "",
+        "operationId": "get_api_governor_source_breakdown",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Governor source breakdown",
+        "tags": [
+          "governor"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "governor:view"
+        ]
+      }
+    },
+    "/api/governor/source-config": {
+      "get": {
+        "description": "Returns the processors, exporters and parallel pipelines to add to a collector the user already runs (any distribution) so it sends samples to the Governor. Parameters: source_id, endpoint, sampling, cluster_name, ca_file. The exporter Authorization header references ${env:COLLECTORCTRL_GOVERNOR_TOKEN} (returned as token_placeholder) for the client to replace with the source token.",
+        "operationId": "get_api_governor_source_config",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "endpoint",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ca_file",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cluster_name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sampling",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Governor source-config",
+        "tags": [
+          "governor"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "governor:view"
+        ]
+      }
+    },
+    "/api/governor/source-tokens": {
+      "delete": {
+        "description": "",
+        "operationId": "delete_api_governor_source_tokens",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Governor source-tokens",
+        "tags": [
+          "governor"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "governor:configure"
+        ]
+      },
+      "get": {
+        "description": "",
+        "operationId": "get_api_governor_source_tokens",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Governor source-tokens",
+        "tags": [
+          "governor"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "governor:view"
+        ]
+      },
+      "post": {
+        "description": "",
+        "operationId": "post_api_governor_source_tokens",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "expires_at": {
+                    "format": "date-time",
+                    "nullable": true,
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Governor source-tokens",
+        "tags": [
+          "governor"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "governor:configure"
+        ]
+      }
+    },
+    "/api/governor/sources": {
+      "delete": {
+        "description": "Deletes the source, revokes all of its tokens and removes the telemetry samples it sent. Collectors still configured with its token are rejected afterwards.",
+        "operationId": "delete_api_governor_sources",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a Governor source",
+        "tags": [
+          "governor"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "governor:configure"
+        ]
+      },
+      "get": {
+        "description": "",
+        "operationId": "get_api_governor_sources",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Governor sources",
+        "tags": [
+          "governor"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "governor:view"
+        ]
+      },
+      "patch": {
+        "description": "Updates enabled and/or the optional declared collector (collector_distribution, collector_version). Observed collectors are read from each exporter User-Agent at ingest, kept per distinct name and version with first_seen, last_seen and request count, returned as `collectors` on GET (last 30 days), and are not writable.",
+        "operationId": "patch_api_governor_sources",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Governor sources",
+        "tags": [
+          "governor"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "governor:configure"
+        ]
+      },
+      "post": {
+        "description": "",
+        "operationId": "post_api_governor_sources",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "collector_distribution": {
+                    "description": "Optional collector distribution that sends this source's telemetry",
+                    "enum": [
+                      "otelcol-contrib",
+                      "otelcol",
+                      "otelcol-k8s",
+                      "splunk",
+                      "datadog",
+                      "aws-adot",
+                      "elastic-edot",
+                      "grafana-alloy",
+                      "dynatrace",
+                      "newrelic-nrdot",
+                      "sumologic",
+                      "bindplane",
+                      "other"
+                    ],
+                    "type": "string"
+                  },
+                  "collector_version": {
+                    "description": "Optional collector version, e.g. 0.104.0",
+                    "type": "string"
+                  },
+                  "daily_quota_bytes": {
+                    "default": 10737418240,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "environment": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "enum": [
+                      "kubernetes",
+                      "ecs",
+                      "lambda",
+                      "gateway",
+                      "otlp"
+                    ],
+                    "type": "string"
+                  },
+                  "labels": {
+                    "description": "JSON object of string labels",
+                    "type": "string"
+                  },
+                  "name": {
+                    "maxLength": 120,
+                    "type": "string"
+                  },
+                  "rate_limit": {
+                    "default": 600,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "name",
+                  "kind",
+                  "environment"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Governor sources",
+        "tags": [
+          "governor"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "governor:configure"
         ]
       }
     },
@@ -5914,14 +6599,14 @@
     },
     "/api/governor/v1/logs": {
       "post": {
-        "description": "Agent-facing ingestion. Requires the per-agent tap token; a management API token is not a substitute.",
+        "description": "Agent-facing ingestion. Requires the per-agent tap token; a management API token is not a substitute. Accepts host agent_id plus tap token, or an ingest-only Bearer ccg_ source token without agent_id. Credentials cannot be combined.",
         "operationId": "post_api_governor_v1_logs",
         "parameters": [
           {
             "example": "agent-id",
             "in": "query",
             "name": "agent_id",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -5989,6 +6674,9 @@
         "security": [
           {
             "agentTapToken": []
+          },
+          {
+            "governorSourceToken": []
           }
         ],
         "summary": "OTLP/HTTP ingestion endpoint for telemetry sandbox logs",
@@ -6003,14 +6691,14 @@
     },
     "/api/governor/v1/metrics": {
       "post": {
-        "description": "Agent-facing ingestion. Requires the per-agent tap token; a management API token is not a substitute.",
+        "description": "Agent-facing ingestion. Requires the per-agent tap token; a management API token is not a substitute. Accepts host agent_id plus tap token, or an ingest-only Bearer ccg_ source token without agent_id. Credentials cannot be combined.",
         "operationId": "post_api_governor_v1_metrics",
         "parameters": [
           {
             "example": "agent-id",
             "in": "query",
             "name": "agent_id",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -6078,6 +6766,9 @@
         "security": [
           {
             "agentTapToken": []
+          },
+          {
+            "governorSourceToken": []
           }
         ],
         "summary": "OTLP/HTTP ingestion endpoint for telemetry sandbox metrics",
@@ -6092,14 +6783,14 @@
     },
     "/api/governor/v1/traces": {
       "post": {
-        "description": "Agent-facing ingestion. Requires the per-agent tap token; a management API token is not a substitute.",
+        "description": "Agent-facing ingestion. Requires the per-agent tap token; a management API token is not a substitute. Accepts host agent_id plus tap token, or an ingest-only Bearer ccg_ source token without agent_id. Credentials cannot be combined.",
         "operationId": "post_api_governor_v1_traces",
         "parameters": [
           {
             "example": "agent-id",
             "in": "query",
             "name": "agent_id",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -6167,6 +6858,9 @@
         "security": [
           {
             "agentTapToken": []
+          },
+          {
+            "governorSourceToken": []
           }
         ],
         "summary": "OTLP/HTTP ingestion endpoint for telemetry sandbox traces",
@@ -7457,6 +8151,47 @@
         ]
       }
     },
+    "/api/k8s/collector-candidates": {
+      "get": {
+        "description": "One entry per operator cluster connection: workloads whose container image names a collector distribution, marked opted in (collectorctrl.io/observe label) or monitored (CollectorMonitor). Built from workload metadata and image names only; no configuration of unobserved workloads is read. Environment authorization uses the cluster connection's classified environment.",
+        "operationId": "get_api_k8s_collector_candidates",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List collector-like Kubernetes workloads reported by each cluster observer",
+        "tags": [
+          "fleet"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "fleet:view"
+        ]
+      }
+    },
     "/api/license/status": {
       "get": {
         "description": "",
@@ -8176,6 +8911,16 @@
       "delete": {
         "description": "",
         "operationId": "delete_api_notifications",
+        "parameters": [
+          {
+            "description": "Environment to show (case-insensitive; omit or All for every environment). Environment-scoped tokens always see only their environment.",
+            "in": "query",
+            "name": "env",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8213,7 +8958,7 @@
         ]
       },
       "get": {
-        "description": "",
+        "description": "Each notification carries the environment (and collector instance_id) it is about; fleet-wide notifications have no environment. X-Unread-Count follows the environment filter.",
         "operationId": "get_api_notifications",
         "parameters": [
           {
@@ -8226,6 +8971,22 @@
           {
             "in": "query",
             "name": "category",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Environment to show (case-insensitive; omit or All for every environment). Environment-scoped tokens always see only their environment.",
+            "in": "query",
+            "name": "env",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "With env, set to false to leave out fleet-wide notifications (default true).",
+            "in": "query",
+            "name": "fleet_wide",
             "schema": {
               "type": "string"
             }
@@ -8268,8 +9029,18 @@
         ]
       },
       "post": {
-        "description": "",
+        "description": "Marks one notification, or all of them, read for the caller. With env, mark_all marks only that environment's notifications.",
         "operationId": "post_api_notifications",
+        "parameters": [
+          {
+            "description": "Environment to show (case-insensitive; omit or All for every environment). Environment-scoped tokens always see only their environment.",
+            "in": "query",
+            "name": "env",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -8337,6 +9108,12 @@
                   "category": {
                     "type": "string"
                   },
+                  "environment": {
+                    "type": "string"
+                  },
+                  "instance_id": {
+                    "type": "string"
+                  },
                   "level": {
                     "type": "string"
                   },
@@ -8390,6 +9167,47 @@
         "x-auth": "bearer",
         "x-permissions-any": [
           "system:notifications"
+        ]
+      }
+    },
+    "/api/notifications/environments": {
+      "get": {
+        "description": "Distinct notification environments within the caller's scope, for the Notification Center filter.",
+        "operationId": "get_api_notifications_environments",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List environments that have notifications",
+        "tags": [
+          "notifications"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "system:view"
         ]
       }
     },
@@ -8496,6 +9314,9 @@
                   },
                   "enabled": {
                     "type": "boolean"
+                  },
+                  "environments": {
+                    "type": "string"
                   },
                   "id": {
                     "type": "integer"
@@ -9203,7 +10024,7 @@
     },
     "/api/policy/canary/promote": {
       "post": {
-        "description": "",
+        "description": "By default releases the candidate in waves: each wave at least doubles the collectors on it (and adds at least 10% of the fleet) once every released collector has applied it and stayed healthy for the bake time (COLLECTORCTRL_WAVE_BAKE_SECONDS, default 120). Problems or a 15-minute apply timeout halt the rollout; calling promote again resumes it. Refused with 409 and a reason when the canary group is empty, has config errors or unhealthy collectors, has not applied the version yet, or is still installing or has rolled back the new binary, unless force=true.",
         "operationId": "post_api_policy_canary_promote",
         "parameters": [
           {
@@ -9213,6 +10034,24 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "description": "Promote even when the canary is not ready. The override and its reason are audited.",
+            "in": "query",
+            "name": "force",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Skip waves and release the candidate to every governed collector now (also finishes an in-progress waved promotion).",
+            "in": "query",
+            "name": "immediate",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -10881,6 +11720,56 @@
           "fleet:configure_sidecar",
           "fleet:configure"
         ]
+      }
+    },
+    "/api/search": {
+      "get": {
+        "description": "Each source is filtered by the caller's own read permission for it; secret-looking YAML values are redacted before matching.",
+        "operationId": "get_api_search",
+        "parameters": [
+          {
+            "description": "Terms are ANDed. Supports \"exact phrase\", -exclude, kind:\u003cprocessor|receiver|exporter|pipeline|rule|policy|package|...\u003e, env:\u003cenvironment\u003e and key:value (matches YAML 'key: value').",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Search everything the caller can read, down to single lines of collector and policy YAML",
+        "tags": [
+          "search"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": []
       }
     },
     "/api/send_custom_message": {

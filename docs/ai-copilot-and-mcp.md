@@ -98,7 +98,7 @@ Read tools need the same permission as the matching API route. Tools marked **ap
 | GitOps | `git_drift`, `git_list_prs`; **approval:** `git_propose_change` |
 | Sidecar | `sidecar_get_config`; **approval:** `sidecar_save_config` |
 | Upgrades and packages | `fleet_list_packages`, `fleet_get_build_status`, `upgrades_status`, `supervisors_list`, `supervisors_check_updates` |
-| Telemetry Governor | `governor_volume`, `governor_cardinality`, `governor_templates`, `governor_engine_status`, `destinations_list`, `destination_test`; **approval:** `governor_set_sampling`, `governor_toggle_tap` |
+| Telemetry Governor | `governor_volume`, `governor_cardinality`, `governor_templates`, `governor_engine_status`, `governor_top_patterns`, `governor_optimize_preview`, `governor_optimize_config`, `governor_optimize_explain_checks`, `destinations_list`, `destination_test`; **approval:** `governor_set_sampling`, `governor_toggle_tap` |
 | Discovery and instrumentation | `discovery_reports`, `instrumentation_list_apps`, `instrumentation_get_rollout_status`, `instrumentation_get_version_policy`; **approval:** `supervisor_set_discovery` and the instrumentation version and pinning tools |
 | Classification | `env_rules_list`, `env_rules_preview` |
 | Proposals | `actions_get_status`, `actions_list_mine` |
@@ -114,6 +114,7 @@ Run `tools/list` against your server for the authoritative list, with input sche
 | `standardize_config_drift` | Find collectors off the standard template and bring them back through a policy |
 | `safe_fleet_config_change` | Roll out a change with validation, a canary and verification |
 | `sidecar_troubleshoot` | Diagnose a failing sidecar without touching the main collector |
+| `optimize_telemetry_volume` | Find noisy log patterns or span routes, build a validated filter or sampling rule, and propose it through a policy |
 
 **Recommended agent workflow:** read state → validate → propose through a policy or pull request (canary for risky changes) → poll `actions_get_status` until it resolves → verify → report.
 

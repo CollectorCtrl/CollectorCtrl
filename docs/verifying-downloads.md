@@ -72,3 +72,17 @@ openssl pkeyutl -verify -pubin -inkey pub.pem -rawin -in msg.bin -sigfile sig.bi
 ## Packages inside CollectorCtrl
 
 When you upload a **supervisor** package under **Settings → Supervisor Lifecycle Management → Package Repository**, upload its `.sig` too. Supervisors install supervisor updates only with a valid release signature. For **collector** packages from other vendors, compare the SHA-256 shown in the **Sign** dialog with the checksum the vendor publishes before you approve it.
+
+## Software bill of materials (SBOM)
+
+From **v0.6.3-beta**, the server and supervisor archives on the [Releases](https://github.com/CollectorCtrl/CollectorCtrl/releases) page have an SBOM next to them: `<file>.spdx.json`, in [SPDX 2.3](https://spdx.github.io/spdx-spec/v2.3/) JSON. `SBOM-SHA256SUMS.txt` lists the checksum of each SBOM.
+
+Each SBOM lists the Go standard library version and every Go module compiled into that binary, with its version and a package URL (`pkg:golang/...`). The SHA-256 of the binary it describes is in the top-level package, so you can match the SBOM to the file you installed. It also records the source revision the binary was built from.
+
+You can load the SBOMs into tools such as Dependency-Track, Grype or Trivy to check for known vulnerabilities, for example:
+
+```bash
+grype sbom:collectorctrl-server_0.6.3-beta_linux_amd64.tar.gz.spdx.json
+```
+
+The Windows installers (`*-setup_*.exe` and the server `.exe` installers) contain the same Go binaries as the archives for the same version. SBOMs for the web UI's JavaScript dependencies and for the Docker image will follow in a later release.

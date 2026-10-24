@@ -1,121 +1,103 @@
 # Release notes
 
-## v0.5.5-beta (1 October 2026)
+## v0.6.3-beta (23 October 2026)
 
-- **Downloads:** [GitHub release v0.5.5-beta](https://github.com/CollectorCtrl/CollectorCtrl/releases/tag/v0.5.5-beta) · every file has a `.sig`, see [Verifying downloads](docs/verifying-downloads.md)
-- **Upgrading from an earlier version?** Read [docs/upgrading.md](docs/upgrading.md) first. Upgrades from 0.5.0 or earlier contain breaking changes.
+- **Downloads:** [GitHub release v0.6.3-beta](https://github.com/CollectorCtrl/CollectorCtrl/releases/tag/v0.6.3-beta) · every file has a `.sig`, see [Verifying downloads](docs/verifying-downloads.md)
+- **All releases, tags and signed files:** [Releases](https://github.com/CollectorCtrl/CollectorCtrl/releases)
+- **Upgrading from an earlier version?** Read [docs/upgrading.md](docs/upgrading.md) first.
 - **Older releases:** [CHANGELOG.md](CHANGELOG.md)
+- **License:** CollectorCtrl is free to use under the [CollectorCtrl Free-to-Use Software License](LICENSE). It is proprietary freeware, not open source.
+
+This release makes environments work the same way everywhere in CollectorCtrl, from the Notification Center to API tokens and alert channels. It also adds safer canary promotions and simpler, verified agent onboarding.
 
 ### Highlights
 
-- **Sidecar collectors are visible across the fleet.** The table, honeycomb and topology views now show sidecar status at a glance. Fleets that don't use sidecars see no change.
-- **Starting or restarting a sidecar no longer affects the main collector.** The main collector stays healthy throughout; only the sidecar's own status changes.
-- **An operations toolkit for AI agents.** 32 new MCP tools and 4 runbook prompts. Agents can follow their proposals to a result, discover configuration templates, read config history with diffs, and change many collectors through policies or GitOps pull requests.
-- **App discovery is tighter.** Turning discovery off now really stops the inventory, every toggle is audited, and bulk changes report exactly what was applied.
-- **The collector page remembers the Sidecar tab** when you refresh the browser or share a link.
+- **Filter notifications by environment.** The Notification Center, the bell count and "Mark read" follow the environment you are working in.
+- **Route alerts by environment.** Send Production alerts to PagerDuty and Development alerts to Slack.
+- **Environment-scoped API tokens.** Choose an environment when you create a token; the token can only see and act on that environment.
+- **Safer canary promotions.** A canary can only be promoted once every collector in the canary group has run the new version and is healthy.
+- **Fewer, clearer alerts during outages.** A network blip that disconnects hundreds of collectors produces one alert per environment instead of hundreds.
+- **Automatic TLS setup and verified agent onboarding.** Get Started detects the server's address and checks the server's certificate authority before anything is downloaded.
 
-### Fleet views: sidecar collectors
+### Notification Center
 
-- **Table:** a **Sidecar** column appears automatically once any collector in view has a sidecar, and you can hide it from the column picker. Each cell shows Running, Starting, Stopped, Error or Unknown. Hover for the version and error reason; click to open that collector on its Sidecar tab.
-- **Fleet summary:** a **Sidecars** row shows enabled, running, stopped, error and unknown counts. It is separate from the collector health tiles, which still describe the main collector only.
-- **Quick filters:** **Sidecar issues** and **Has sidecar**. They are filtered on the server, so they work with paging.
-- **Honeycomb:** hosts with a sidecar get a badge on the corner of their hexagon, in the standard status colours and with a symbol, so it doesn't rely on colour alone:
-  - green ✓: running
-  - grey ■: stopped
-  - red !: error
-  - dashed grey ?: unknown or starting
+- **Environment filter.** Pick an environment in the Notification Center. It follows the environment selected on the Fleet page, and you can change it in the panel.
+- **Environment on every notification.** Each notification shows the environment it came from. Notifications that apply to the whole installation, such as license, Git sync or rollouts spanning environments, are shown as **Fleet-wide** and appear under every filter.
+- **Actions that respect your filter.** With an environment selected, the bell counts that environment, **Mark Read** marks only that environment, and **Clear** keeps fleet-wide history.
+- **History kept per environment.** Each environment keeps its latest 250 notifications, so a busy environment can't push another environment's alerts out.
+- **New "Other" category** for upgrade, security, Git and AI notifications, which were previously only visible under "All".
 
-  A dark ring keeps it visible on any hexagon, including a green one. A small key explains the badges, and the tooltip includes a sidecar line. Kubernetes cards get a "Sidecar: <status>" badge.
-- **Consistent colours everywhere:** the table, summary, topology badges, the topology side panel and the collector page's Sidecar tab all use the same status colours: green for running, red for error, grey otherwise.
-- **Topology:**
-  - Collector and gateway nodes show a "+ sidecar" badge. Grouped nodes show counts, for example "5 with sidecar · 1 error".
-  - The side panel shows the sidecar's status, version and error, with an **Open sidecar** button.
-  - The **Issues** filter now includes healthy hosts whose sidecar is failing.
-- **Clearer naming:** the classification role for collectors running as a Kubernetes sidecar container is now shown as **K8s sidecar**, so it isn't confused with CollectorCtrl's sidecar collector.
+### Alert channels
 
-### Collector lifecycle isolation
+- **Limit a channel to environments.** Each Slack, Microsoft Teams, PagerDuty or webhook channel can receive all environments or only the ones you select. Fleet-wide notifications reach every channel.
+- **Environment in every alert.** Slack, Teams, PagerDuty and webhook messages include the environment, and webhooks also include the collector ID.
 
-- **Sidecar start and restart are fully isolated.** Previously the main collector briefly showed as unhealthy, so it looked as if both collectors had restarted. The main collector process was never actually restarted; this was a status-reporting problem.
-- **The sidecar shows "Starting"** for up to 20 seconds after it launches, while its health endpoint comes up. If it is still failing after that, it reports an error as before.
-- **A failing sidecar never marks the main collector unhealthy.** This applies to:
-  - fleet status
-  - Copilot and MCP answers
-  - the saved health state
-  - upgrade verification
+### Fewer alerts during outages
 
-  It also applies to supervisors already deployed, once the server is updated.
+- When many collectors disconnect or reject a configuration at the same time, CollectorCtrl groups the events for a few seconds. Up to 5 in an environment are reported individually. More than that become one summary, such as "42 collectors disconnected in production", which links to the affected collectors.
 
-### Collector detail page
+### Environment-scoped access
 
-- **The Main/Sidecar tab is kept in the URL** (`?tab=sidecar`), so a refresh or a shared link opens the same tab.
-- If a link points to a sidecar that no longer exists, the page falls back to the Main tab.
-- Switching tabs doesn't add browser history entries, so **Back** still returns to the fleet.
+- **Environment field on API tokens.** Create a token for a single environment and see each token's environment in the token list. CollectorCtrl warns you if no collector or rule uses that environment yet.
+- **Scope is enforced everywhere.** A token limited to one environment only sees that environment's collectors, notifications, search results and Copilot answers, and can only create tokens for its own environment.
+- **Consistent environment names.** `prod`, `Prod` and ` PROD ` are treated as the same environment on every page, filter, policy, token and Copilot tool.
 
-### AI operations over MCP
+### Fleet Classification Rules
 
-New tools, all following the same permissions as the matching API routes:
+- **Reserved names.** Rules can no longer set the environment to `All`, `unknown` or `default`. Existing rules with these names keep working until you next edit them.
+- **One spelling per environment.** If a rule already uses `Production`, a new rule entered as `production` uses `Production` too.
+- **Better impact preview.** When a change would leave an environment with no collectors, the preview lists everything that still uses it: API tokens, policies, Governor sources, instrumented applications, agent version overrides and alert channels.
+- **"Unclassified" collectors and hosts.** Collectors, discovered hosts and applications without an environment are shown as **Unclassified**.
+- The settings page is now called **Fleet Classification Rules**.
 
-- **Follow proposals:** `actions_get_status` and `actions_list_mine`. Agents check whether a change was approved, executed, rejected or expired instead of assuming it ran. Each agent sees only its own proposals; approvers see all.
-- **Template discovery:** `templates_list`, `templates_get_agents` and `templates_drift` show the distinct configurations running in the fleet, who uses each, and recent drift.
-- **Config history:** `config_history_list` and `config_history_get`. The latter includes a diff to the current configuration.
-- **Policies:**
-  - Read-only: `policies_list`, `policy_get_history`, `policy_effective`, `policy_rollout_status`, `policy_preview_matches` and `policy_validate`.
-  - Need approval: `policy_save`, `policy_canary_promote` and `policy_canary_abort`.
-- **GitOps:** `git_drift`, `git_list_prs`, and `git_propose_change`, which needs approval and then opens a pull request.
-- **Triage and scoping:** `notifications_list`, `environments_list`, `env_rules_list`, `env_rules_preview` and `inventory_facets`.
-- **Sidecar:** `sidecar_get_config`, and `sidecar_save_config`, which needs approval. Settings you leave out keep their current value.
-- **Upgrades:** `upgrades_status` and `supervisors_check_updates`.
-- **Destinations and discovery:**
-  - `destinations_list` and `destination_test`. The test is a dry run and saves nothing.
-  - `supervisor_set_discovery`, which needs approval.
-- **Runbook prompts** (new MCP prompts capability): `triage_unhealthy_collector`, `standardize_config_drift`, `safe_fleet_config_change` and `sidecar_troubleshoot`.
+### Canary rollouts and policies
 
-Safety:
+- **Every canary collector must check out.** Before a canary can be promoted, every collector in the canary group must be connected, assigned to the policy and running its current version. Otherwise CollectorCtrl explains what is missing, for example "1 have not received this policy". You can still force a promotion, and every forced promotion is recorded in the audit log.
+- **Up-to-date acknowledgements only.** A collector that confirmed an older version of the policy no longer counts as up to date, during canaries or waved rollouts.
+- **Resuming a paused rollout.** Offline collectors don't block resuming a halted rollout; they receive the new version when they reconnect.
+- **Accurate policy preview.** The policy wizard lists exactly the collectors the policy will apply to, including policies that target an environment or role.
+- **Agent version overrides follow classification.** Overrides that target an environment now use the environment assigned by your Fleet Classification Rules.
 
-- Every change is still a proposal that a person approves in the UI.
-- Policy, canary and GitOps proposals are refused for environment-scoped tokens, because a policy can match collectors in any environment.
-- The approval limit counts the collectors actually affected: the collectors a policy matches, only the first batch for a canary rollout, and zero for a pull request.
-- At approval time the proposal is checked again, so a policy edited in the meantime is never overwritten.
-- `fleet_push_config` now points agents to policies or pull requests for changes meant for more than one collector.
-- The approvals panel and the Copilot show clear names for the new actions.
+### Automatic TLS setup and agent onboarding
 
-### Supervisor management and app discovery
+CollectorCtrl now uses the server's detected address automatically and verifies certificate trust before downloading the installer.
 
-- **Discovery is off by default** (confirmed) and is controlled per supervisor from **Settings → Supervisor Management**.
-- **Turning discovery off really stops it.** Reports from a supervisor whose discovery is off are now ignored, so a scan that was already running can't bring the inventory back.
-- **Every sidecar or discovery toggle is recorded** in the audit log.
-- **Bulk changes report their result.** You now see "Updated discovery for 3 of 5; 2 not found" instead of a blanket success. Requests that change nothing are rejected.
-- **The API reference** now describes this endpoint correctly.
+- **Automatic server address detection.** Direct VM and EC2 installations need no manual address entry, even when the console is opened through `localhost`. Custom address overrides remain available for load balancers and other network setups.
+- **Automatic certificate migration.** Older CollectorCtrl-generated console certificates are replaced with the managed server certificate at startup, so the console and agents trust the same certificate authority. Your existing CA and any custom certificates are preserved.
+- **Verified installer downloads.** Linux, macOS and Windows onboarding commands verify the server's CA fingerprint before downloading and running the installation script.
+- **Clear installation failures.** Download errors and certificate mismatches stop the installation with a visible error instead of exiting silently.
+- **Automation support.** Linux Terraform and cloud-init snippets use the same verified download flow.
+- **IPv6 support.** Onboarding commands work with IPv6 server addresses.
 
-### Discovered applications
+### Fixes
 
-- **Memory usage has been removed** from discovery, the inventory API and the UI. Resource metrics belong to the collector (`hostmetrics` / `process`), not the control plane, and the scanned value was out of date immediately.
+- Linux onboarding failed when the HTTPS certificate did not include the server's private IP address.
+- Generated onboarding commands hid download errors and could pass an empty response to Bash.
+- The CA fingerprint was checked only after the installer had already been downloaded.
+- A canary could be promoted while a collector in the canary group was disconnected or had never received the new version.
+- The policy wizard could list different collectors than the ones the policy actually applied to.
+- Environment filters treated differently capitalized names (`Prod` and `prod`) as different environments on some pages.
 
-### Notable fixes
+### API changes
 
-- **Notification "View Details" goes to the right place.** Git sync alerts used to land on Fleet Overview; they now open **Settings → Git Integration**. Every notification now links to its details:
-  - Collector events (disconnected, config rejected, upgrade failed or rolled back, impersonation attempt) open that collector.
-  - Agent baseline, ring override, node pin, catalog upload/delete and reconcile notifications open **Instrumentation → Agent Baselines & Central Catalog**. Most of these had no link before.
-  - Instrumentation dispatch notifications open the discovered inventory.
-
-  Notifications already stored with the old link format also open the right page.
-- Refreshing the collector page no longer resets the Sidecar tab to Main.
-- Opening a different collector no longer carries over a Sidecar tab left in the URL from the previous one.
-- Hosts without a sidecar now show **Disabled** instead of **Stopped**, which was indistinguishable from an enabled sidecar that had been stopped.
-- The Stop button for a disabled sidecar stays disabled correctly.
+- `GET /api/notifications` accepts `env` and returns `environment` and `instance_id` for each notification.
+- `POST` and `DELETE /api/notifications` accept `env` to mark or clear one environment.
+- New `GET /api/notifications/environments` lists the environments that have notifications.
+- Alert channels accept `environments` (comma-separated; empty means all).
+- Creating an API token returns the token's `environment` and, when relevant, a `warning`.
+- The Copilot/MCP `notifications_list` tool accepts an `environment` argument.
 
 ### Upgrade notes
 
-- **Deploy the updated supervisor** together with the server for the sidecar "Starting" state.
-  - The server-side health fix works with supervisors already in the field.
-  - The top-level health error now describes the main collector only. Alert rules that matched the old text "Collectors are not healthy: …" need updating.
-- **API changes:**
-  - `POST /api/governor/supervisors/configure` returns per-instance results (`updated`, `not_found`, `invalid`, `failed`). It responds 400, 404 or 500 when nothing was applied, and 400 for an empty request. Scripts that assumed it always returns 200 should check the response.
-  - Fleet rows (`/api/agents`) include `SidecarEnabled`, and the fleet summary includes `Sidecars` counts. Hosts without a sidecar report `SidecarStatusLabel: "Disabled"` (previously `"Stopped"`).
-  - New fleet presets: `preset=sidecar` and `preset=sidecar_issues`.
-  - `memory_usage_mb` is no longer included in discovery reports or the inventory API.
-- **New audit actions:** `CONFIGURE_SUPERVISORS` and `CONFIGURE_SUPERVISORS_FAILED`.
-- **MCP:**
-  - The server now advertises prompts in its capabilities.
-  - With the default approval limit of 10 collectors, policy saves and canary promotions that match more collectors are refused until an admin raises the limit. GitOps pull requests are not affected.
-- **Role label:** only the display name changed to "K8s sidecar". The stored and API value is still `sidecar`.
+- **Deploy and restart.** Deploy the updated server and frontend, then restart the server. Database changes are applied automatically.
+- **Generate fresh onboarding commands.** Commands copied from Get Started before this release do not use the verified download flow. Generate a new one. The OpenTelemetry Collector binary and configuration must already exist at the paths you specify. Include an enrollment token to enable agent authentication. Windows hosts need `curl.exe`, which is included in current Windows versions.
+- **Older notifications** have no environment and appear as Fleet-wide.
+- **Disconnect alerts may arrive a few seconds later** and may be grouped into a summary. Alert rules that match the exact title "Collector Disconnected: …" or "Config Rejection: …" will not match a summary.
+- **Environment names are no longer case-sensitive.** A token limited to `prod` now also sees collectors classified as `Prod`. Review your scoped tokens if you used capitalization to separate environments.
+- **Unclassified hosts and applications** now report `unknown` instead of `default`. Telemetry Governor S3 archive paths still use `environment=default`.
+
+### Documentation
+
+- **Automatic server addresses and agent onboarding:** address detection, certificate migration, verified installation and optional overrides (`COLLECTORCTRL_ADVERTISE_HOST`, `COLLECTORCTRL_OPAMP_ENDPOINT`, `COLLECTORCTRL_TLS_*`, `COLLECTORCTRL_UI_*`).
+- **Uninstall CollectorCtrl on Linux:** removing the server, supervisor and the optional PostgreSQL database.
+

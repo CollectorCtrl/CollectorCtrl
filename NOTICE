@@ -13,7 +13,7 @@ CollectorCtrl includes software derived from OpenTelemetry OpAMP Go
 Authors (https://opentelemetry.io/).
 
   Copyright The OpenTelemetry Authors
-  Portions modified: Copyright 2026 Ankita Rahul Mhatre
+  Portions modified: Copyright 2026 CollectorCtrl
 
 These portions are licensed under the Apache License, Version 2.0. A copy of
 that license is in third_party/licenses/Apache-2.0.txt. You may not use those

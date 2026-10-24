@@ -6,8 +6,8 @@ CollectorCtrl is in public beta. Security fixes are made in the **latest release
 
 | Version | Supported |
 | :--- | :--- |
-| Latest 0.5.x beta (currently v0.5.5-beta) | ✅ |
-| Earlier 0.5.x betas | ⚠️ Upgrade to the latest release |
+| Latest 0.6.x beta (currently v0.6.3-beta) | ✅ |
+| Earlier 0.6.x and 0.5.x betas | ⚠️ Upgrade to the latest release |
 | 0.4.x and earlier | ❌ |
 
 Releases before v0.5.1-beta lack per-agent enrollment, per-install TLS and package signing. If you run one, upgrade: see [docs/upgrading.md](docs/upgrading.md).

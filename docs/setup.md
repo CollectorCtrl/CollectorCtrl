@@ -18,17 +18,17 @@ This guide installs the **CollectorCtrl Server**. To connect hosts afterwards, s
 
 ### Release files
 
-Download from the [latest release](https://github.com/CollectorCtrl/CollectorCtrl/releases). Replace `<version>` below with the release version, for example `0.6.3-beta`.
+Download from the [latest release](https://github.com/CollectorCtrl/CollectorCtrl/releases). Replace `<version>` below with the release version, for example `0.8.0-beta`.
 
 | Platform | Server | Supervisor (for managed hosts) |
 | :--- | :--- | :--- |
-| Windows | `collectorctrl-server_<version>_windows_<arch>.exe`: installer, SQLite edition<br>`collectorctrl-server-postgres_<version>_windows_<arch>.exe`: installer, PostgreSQL edition | `collectorctrl-supervisor-setup_<version>_windows_<arch>.exe`: installer<br>`collectorctrl-supervisor_<version>_windows_<arch>.exe`: binary only |
+| Windows | `collectorctrl-server_<version>_windows_<arch>.exe`: installer, SQLite edition<br>`collectorctrl-server-postgres_<version>_windows_<arch>.exe`: installer, PostgreSQL edition | `collectorctrl-supervisor-setup_<version>_windows_<arch>.exe`: setup program<br>`collectorctrl-supervisor_<version>_windows_<arch>.msi`: MSI for deployment tools<br>`collectorctrl-supervisor_<version>_windows_<arch>.exe`: binary only, for upgrades pushed by the server |
 | Linux | `collectorctrl-server_<version>_linux_<arch>.tar.gz`<br>`collectorctrl-server-postgres_<version>_linux_<arch>.tar.gz` | `collectorctrl-supervisor_<version>_linux_<arch>.tar.gz` |
 | macOS | `collectorctrl-server_<version>_darwin_<arch>.tar.gz`<br>`collectorctrl-server-postgres_<version>_darwin_<arch>.tar.gz` | `collectorctrl-supervisor_<version>_darwin_<arch>.tar.gz` |
 
-`<arch>` is `amd64` or `arm64`. Each file has a `.sig` next to it: [verify it](verifying-downloads.md) before installing.
+`<arch>` is `amd64` or `arm64`. Each file has a `.sig` next to it: [verify it](verifying-downloads.md) before installing. The Windows setup programs and the MSI are not Authenticode-signed. The v0.8.0-beta release notes describe supervisor `.deb` and `.rpm` packages, but the v0.8.0-beta release page does not list any.
 
-> You rarely need to download the Supervisor by hand. The **Get Started** page in the UI generates a command that fetches and installs it for you.
+> You rarely need to download the Supervisor by hand. **Add collector** in the UI generates a command that fetches and installs it for you.
 
 ### Ports
 
@@ -47,7 +47,7 @@ Supervisors only make **outbound** connections. No inbound ports are needed on m
 | Evaluation, up to ~250 collectors | 2 vCPU | 2–4 GB | SQLite |
 | Up to 1,000 collectors | 4 vCPU | 4–8 GB | SQLite or PostgreSQL |
 
-In our load tests (August 2026) the server used under 135 MB of memory with 1,000 connected collectors on both SQLite and PostgreSQL. Larger fleets are not benchmarked yet. Run a **single server instance**: multi-replica high availability isn't supported yet.
+In our load tests (August 2026) the server used under 135 MB of memory with 1,000 connected collectors on both SQLite and PostgreSQL. Larger fleets are not benchmarked yet, and Governance (the Telemetry Governor) has not been load-tested: its samples are stored one row per record in the server's database. Run a **single server instance**: multi-replica high availability isn't supported yet.
 
 ### Where the server keeps its state
 
@@ -73,7 +73,9 @@ docker run -d --name collectorctrl --restart unless-stopped \
   ghcr.io/collectorctrl/collectorctrl-server:latest
 ```
 
-- Image: `ghcr.io/collectorctrl/collectorctrl-server`. `latest` tracks the newest build; immutable `main-<commit>` tags are also published.
+- Image: `ghcr.io/collectorctrl/collectorctrl-server`. Since v0.6.4-beta, releases publish versioned tags such as `0.6.4-beta`, and `latest` moves only on releases. The images are signed with cosign and carry an SPDX SBOM.
+- This command does not set production mode or an administrator password, so the first sign-in is `admin` / `admin` with a forced password change. See [First sign-in](#first-sign-in).
+- The standard image has no Go toolchain, so it cannot run Custom builds.
 - Runs as a non-root user (UID 1000).
 - The database (SQLite), CA, secrets, uploaded packages and agent assets live under `/var/lib/collectorctrl`. **Do not mount a volume over `/opt/collectorctrl`**: that hides the application binaries.
 - Logs: `docker logs -f collectorctrl`.
@@ -98,6 +100,7 @@ docker compose up -d
 ```
 
 - `docker compose up` refuses to start while any of the three secrets is missing.
+- The server runs in production mode. Add `COLLECTORCTRL_ADMIN_PASSWORD` to the server's environment before the first start, or read the one-time administrator password from `docker compose logs` after it.
 - PostgreSQL is reachable only from the server container. It isn't published on the host.
 - Back up **both** volumes: `collectorctrl_data` (CA, keys, secrets) and `postgres_data` (database). Keep `.env` in your secret manager: the secrets in it aren't stored anywhere else.
 
@@ -107,9 +110,10 @@ Windows Server or Windows 10/11, on amd64 or arm64.
 
 1. Download one of the server installers:
    - `collectorctrl-server_<version>_windows_<arch>.exe`: **SQLite edition**, no external database.
-   - `collectorctrl-server-postgres_<version>_windows_<arch>.exe`: **PostgreSQL edition**. The installer asks for the PostgreSQL host, port, user and password.
-2. Run it as Administrator. It installs to `C:\Program Files\CollectorCtrl`, registers and starts the **CollectorCtrl** Windows service, and offers to open the console at `https://localhost:4321`.
-3. Restrict the data directory, which holds private keys and secrets, to SYSTEM and Administrators:
+   - `collectorctrl-server-postgres_<version>_windows_<arch>.exe`: **PostgreSQL edition**. It installs the bundled PostgreSQL locally, or connects to an existing PostgreSQL database that you name (host, user, password, database, SSL mode). For the bundled instance the superuser password is generated and saved in `C:\ProgramData\CollectorCtrl\postgres-superuser-password.txt` (Administrators and SYSTEM only), and a reinstall reuses that instance. Setup refuses to touch a PostgreSQL it did not install.
+2. Run it as Administrator. On a first install, the **Administrator Account** page asks for the password of the `admin` account. For a silent install pass `/ADMIN_PASSWORD=`. An upgrade keeps the existing accounts.
+3. Setup installs to `C:\Program Files\CollectorCtrl`, registers and starts the **CollectorCtrl** Windows service, confirms that the service is running before it reports success, writes a setup log, and offers to open the console at `https://localhost:4321`.
+4. Restrict the data directory, which holds private keys and secrets, to SYSTEM and Administrators:
 
    ```powershell
    icacls "$env:ProgramData\CollectorCtrl" /inheritance:r /grant:r "SYSTEM:(OI)(CI)F" "Administrators:(OI)(CI)F"
@@ -139,7 +143,11 @@ tar -xzf collectorctrl-server_<version>_linux_amd64.tar.gz
 sudo ./install.sh
 ```
 
-The installer copies the server and web assets to `/opt/collectorctrl-server`, installs the **`collectorctrl`** systemd service, and starts it. The installer in the `-postgres` archive also installs PostgreSQL with your package manager and creates the `collectorctrl` database and user.
+The installer copies the server and web assets to `/opt/collectorctrl-server`, installs the **`collectorctrl`** systemd service, and starts it.
+
+On a first install it sets the password of the `admin` account. It takes the password from `--admin-password-file FILE` (the first line of the file) or `COLLECTORCTRL_ADMIN_PASSWORD`, asks for it on a terminal, or otherwise generates one and prints it once at the end. Upgrades keep the existing accounts.
+
+The installer in the `-postgres` archive also installs PostgreSQL with your package manager and creates a `collectorctrl` role, with a generated password, that owns the `collectorctrl` database. It does not alter the `postgres` superuser. A database connection you configured yourself is kept.
 
 ```bash
 sudo systemctl status collectorctrl
@@ -148,11 +156,11 @@ sudo journalctl -u collectorctrl -f
 
 ### Recommended: production settings
 
-Keep settings in an environment file that only root and the service can read:
+The service unit reads optional settings from `/etc/collectorctrl/server.env`. Keep that file readable by root only:
 
 ```bash
 sudo mkdir -p /etc/collectorctrl /var/lib/collectorctrl
-sudo tee /etc/collectorctrl/server.env >/dev/null <<EOF
+sudo tee -a /etc/collectorctrl/server.env >/dev/null <<EOF
 COLLECTORCTRL_MODE=production
 COLLECTORCTRL_DATA_DIR=/var/lib/collectorctrl
 COLLECTORCTRL_JWT_SECRET=$(openssl rand -hex 32)
@@ -163,11 +171,7 @@ COLLECTORCTRL_ENCRYPTION_KEY=$(openssl rand -hex 32)
 EOF
 sudo chmod 600 /etc/collectorctrl/server.env
 
-sudo systemctl edit collectorctrl
-#   [Service]
-#   EnvironmentFile=/etc/collectorctrl/server.env
-
-sudo systemctl daemon-reload && sudo systemctl restart collectorctrl
+sudo systemctl restart collectorctrl
 ```
 
 In production mode the server refuses to start without `COLLECTORCTRL_JWT_SECRET` and `COLLECTORCTRL_ENCRYPTION_KEY`, and refuses plaintext listeners on non-loopback addresses. All settings: [Configuration reference](configuration.md).
@@ -193,13 +197,13 @@ The data directory is the directory you start the server from, unless `COLLECTOR
 
 ## Kubernetes
 
-The server runs in Kubernetes as a **single replica** with a persistent volume mounted at `/var/lib/collectorctrl`, the container image above, ports 4320 and 4321, and HTTPS health probes on `/api/health`. Don't scale beyond one replica until high availability ships.
+The server runs in Kubernetes as a **single replica** with a persistent volume mounted at `/var/lib/collectorctrl`, the container image above, ports 4320 and 4321, and HTTPS probes on `/api/health` (liveness) and `/readyz` (readiness). Run it with `COLLECTORCTRL_MODE=production`: the first administrator password is then generated and printed once in the server log, unless you set `COLLECTORCTRL_ADMIN_PASSWORD`. Don't scale beyond one replica: running two active servers against one database is not supported.
 
 Collectors that run in Kubernetes can be **observed** (pilot, since v0.6.0) with the [CollectorCtrl Kubernetes observer](https://github.com/CollectorCtrl/CollectorCtrl-K8s-Operator). It shows collector Deployments, DaemonSets and StatefulSets deployed by your own Helm charts or GitOps next to host collectors. Changes to those workloads stay with your deployment system.
 
 The observer enrolls like a supervisor:
 
-1. Create an enrollment token under **Settings → API Tokens → Agent Enrollment**, store it in a Secret in the observer's namespace under `enrollment-token`, and reference it with `opamp.enrollmentSecret`.
+1. Create an enrollment token under **Settings → Tokens**, store it in a Secret in the observer's namespace under `enrollment-token`, and reference it with `opamp.enrollmentSecret`.
 2. Give it persistent credential storage (the chart creates a retained PVC, or set `credentialStorage.existingClaim`) and keep that storage across upgrades.
 3. Run **one** observer replica.
 4. Set the server's WSS endpoint with `opamp.server`, and `opampCAConfigMap` if the server uses a private CA.
@@ -211,8 +215,16 @@ Installations that still use the shared secret need `OPAMP_LEGACY_MODE=true` onl
 ## First sign-in
 
 1. Open `https://<server>:4321`. Your browser warns about the certificate until you trust the server's CA. You can download it from `https://<server>:4321/api/onboard/ca.pem`; its SHA-256 fingerprint is printed in the server's start-up log.
-2. Sign in as **`admin` / `admin`** and choose a new password when prompted. To set the initial password instead, start the server for the first time with `COLLECTORCTRL_ADMIN_PASSWORD`.
-3. Go to **Get Started**, create an enrollment token, and [connect your first collector](agent-onboarding.md).
+2. Sign in as **`admin`**. The password depends on how the server was installed:
+
+   | Install | First password |
+   | :--- | :--- |
+   | Windows or Linux installer | The one you chose during installation, or the generated one the installer showed once. |
+   | `COLLECTORCTRL_ADMIN_PASSWORD` set at the first start | That value. |
+   | Production mode (`COLLECTORCTRL_MODE=production`) without it: Compose example, Kubernetes | A one-time password printed once in the server log. It must be changed at first sign-in. |
+   | Anything else, such as the evaluation `docker run` or a binary started by hand | `admin`. It must be changed at first sign-in, and until then the account can do nothing else. Don't expose the server to a network in this state. |
+
+3. Click **Add collector**, create an enrollment token, and [connect your first collector](agent-onboarding.md).
 4. Recommended next steps: configure [SSO](security.md#single-sign-on), create roles, set up [backups](upgrading.md#backup-and-restore), and connect the [Copilot](ai-copilot-and-mcp.md) to your model provider.
 
 ---
@@ -225,6 +237,7 @@ Installations that still use the shared secret need `OPAMP_LEGACY_MODE=true` onl
 | Server won't start: certificate / TLS error | The server refuses to start rather than fall back to plain HTTP. Check `COLLECTORCTRL_UI_CERT` / `COLLECTORCTRL_UI_KEY`, or that the data directory is writable so the server can create its CA. |
 | Server won't start in production mode | Set `COLLECTORCTRL_JWT_SECRET` and `COLLECTORCTRL_ENCRYPTION_KEY`. `COLLECTORCTRL_UI_TLS=plain` is refused on non-loopback addresses. |
 | Agents locked out after a container restart | The data volume wasn't persisted, so a new CA was created. Mount `/var/lib/collectorctrl` and re-enroll. |
+| Supervisor log shows `401 Unauthorized` | The supervisor was installed without an enrollment token. Run the installer again with a token from **Add collector**. |
 | Agent doesn't appear in Fleet | Port 4320 reachable from the host? Agent enrolled with a valid, unexpired token? Check **Notifications** for rejected or impersonation events. |
 
 Logs:
@@ -233,4 +246,4 @@ Logs:
 | :--- | :--- | :--- |
 | Docker | `docker logs collectorctrl` | — |
 | Linux | `journalctl -u collectorctrl` | `journalctl -u collectorctrl-supervisor` |
-| Windows | Run `C:\Program Files\CollectorCtrl\server.exe` from an elevated prompt to see start-up errors | `%PROGRAMDATA%\CollectorCtrlSupervisor\supervisor.log` |
+| Windows | Run `C:\Program Files\CollectorCtrl\server.exe` from an elevated prompt to see start-up errors | `supervisor.log` in the Supervisor's installation folder; installer steps in `C:\ProgramData\CollectorCtrlSupervisor\setup.log` (MSI) |

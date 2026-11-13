@@ -1,8 +1,9 @@
 # CONTEXT: CollectorCtrl (public product repository)
 
-Working context for teammates and AI assistants. Everything here comes from the files in this repository as of
-**v0.6.3-beta** (23 October 2026). This repo contains **no product source code**: control-plane behaviour below is
-*as documented*, not verified against code. Unconfirmed points are under [Open questions](#10-open-questions).
+Working context for teammates and AI assistants, as of **v0.8.0-beta** (12 November 2026). This repo contains
+**no product source code**. The v0.8.0-beta documentation update was checked against the private product source and
+the published release assets; older statements are *as documented*. Unconfirmed points are under
+[Open questions](#10-open-questions).
 
 ---
 
@@ -46,9 +47,9 @@ Of the product (as documented):
 | Server | Single Go binary with embedded web UI; REST API, MCP endpoint, OpAMP gateway |
 | Storage | SQLite (default) or PostgreSQL; auto-migrations at start-up |
 | Protocol | OpAMP over WSS; includes software derived from `open-telemetry/opamp-go` (Apache-2.0, see `NOTICE`) |
-| Supervisor | OS-native agent: Windows service, systemd unit, launchd daemon |
+| Supervisor | OS-native agent: Windows service, systemd unit, launchd daemon. Windows setup program and MSI; Linux/macOS `.tar.gz` with `install.sh` |
 | Platforms | Windows, Linux, macOS (amd64, arm64); Docker (server only); Kubernetes single replica |
-| Signing | Ed25519 detached `.sig` on every release file since v0.5.1-beta; SPDX 2.3 SBOMs since v0.6.3-beta |
+| Signing | Ed25519 detached `.sig` on every release file since v0.5.1-beta; SPDX 2.3 SBOMs since v0.6.3-beta (signed, and for every installer, since v0.6.4-beta); container images signed with cosign since v0.6.4-beta. Windows setup programs and MSI are not Authenticode-signed |
 
 ## 3. Architecture (as documented)
 
@@ -58,7 +59,7 @@ flowchart LR
     subgraph CP["CollectorCtrl Server (single binary)"]
         UI["Web UI · REST API · /api/mcp · Copilot"]
         GW["OpAMP gateway :4320"]
-        BG["Git sync · rollouts · watchdogs · Governor · audit · notifications"]
+        BG["Git sync · rollouts · watchdogs · Governance · audit · notifications"]
     end
     CP --- DB[("SQLite / PostgreSQL")]
     CP --- DD[("Data dir: CA · keys · secrets · packages")]
@@ -68,7 +69,7 @@ flowchart LR
     subgraph H["Managed host"]
         S["Supervisor"] --> C["Main collector"]
         S -.-> SC["Sidecar collector"]
-        S -.-> APP["Instrumented apps (ZeroTouch)"]
+        S -.-> APP["Instrumented apps (Instrumentation)"]
     end
     S == "OpAMP WSS · per-agent credential<br/>HTTPS package downloads" ==> CP
     K["K8s observer (pilot)"] == "OpAMP WSS" ==> CP
@@ -98,10 +99,11 @@ The control plane never sits in the telemetry data path.
 | Audit / SIEM | Hash-chained, verify integrity, CSV export; real-time OTLP log stream over TLS | `security.md` |
 | Sidecar pipelines | Second collector per host, own executable, independent lifecycle and health | `agent-onboarding.md` |
 | OCB integration | "Custom Builder" runs `ocb` from UI; output lands in package repo for signing/rollout | `features.md` |
-| Telemetry Governor | Taps (default 10% sampling, trace-ID based), Insights (measured counts only), pattern/span optimizer, S3/OTLP destinations | `features.md`, `upgrading.md` |
+| Governance (Telemetry Governor) | One global sampling rate for every tap and external source (default 10%, **Governance → Configuration**); Insights (measured counts only, newest 100,000 records per query, 30 s cache); pattern/span optimizer (canary required for drop rules); S3/OTLP destinations; `collectorctrl_governor_*` metrics; not load-tested | `features.md`, `configuration.md`, `upgrading.md` |
+| Installation | Admin password chosen or generated at install; supervisor installers take the enrollment token, CA, labels; takeover of an existing collector service; MSI; machine images (`--no-start`, `-reset-identity`); unprivileged mode (Linux); air-gapped mirror; release-signature check in the one-line install commands; canary supervisor upgrades | `setup.md`, `agent-onboarding.md`, `enterprise-deployment.md`, `verifying-downloads.md` |
 | AI Copilot | Read-only tools on live data, streamed steps; proposes with diff + blast radius; providers OpenAI, Anthropic, Gemini, OpenAI-compatible; PII redaction | `ai-copilot-and-mcp.md` |
 | MCP server | `POST /api/mcp` JSON-RPC 2.0, bearer API token, per-tool RBAC, audit actor `mcp:<user>`; stdio adapter `collectorctrl-mcp` (not yet in downloads) | `ai-copilot-and-mcp.md` |
-| Human approval | Mutating tools create pending actions; approve in Settings → Pending AI Actions; needs `mcp:approve` + action permission/scope; API tokens can't approve; 15 min expiry; blast-radius cap (default 10); optional four-eyes; auto-approve needs env flag **and** `mcp:auto-approve` | `ai-copilot-and-mcp.md` |
+| Human approval | Mutating tools create pending actions; approve under Rollouts → Approvals; needs `mcp:approve` + action permission/scope; API tokens can't approve; 15 min expiry; blast-radius cap (default 10); optional four-eyes; auto-approve needs env flag **and** `mcp:auto-approve` | `ai-copilot-and-mcp.md` |
 | Storage | SQLite/PostgreSQL + data directory (CA, encryption key, session/OpAMP/tap secrets, package-signing key); settings encrypted at rest | `configuration.md` |
 
 ### Ports
@@ -109,27 +111,28 @@ The control plane never sits in the telemetry data path.
 | Port | Purpose |
 | --- | --- |
 | 4320 | OpAMP gateway (WSS) |
-| 4321 | UI, REST API, MCP, onboarding scripts, CA, package downloads (HTTPS) |
+| 4321 | UI, REST API, MCP, onboarding scripts, CA, package mirror (`/packages/`), `/readyz`, `/metrics` (HTTPS) |
 | 5432 | PostgreSQL (if used) |
-| 13133 | Collector health check (local on host) |
+| 13133 | Collector health check (`127.0.0.1` on host since v0.7.0-beta) |
 
 ## 4. Repo map
 
 | Path | What it is |
 | --- | --- |
 | `README.md` | Product overview, quick start, platforms, feature maturity, docs index |
-| `RELEASE_NOTES.md` | Notes for the current release (v0.6.3-beta) only |
-| `CHANGELOG.md` | One-line summary per release, 0.1.0-alpha → 0.6.3-beta; ⚠️ marks breaking |
+| `RELEASE_NOTES.md` | Notes for the current release (v0.8.0-beta) only |
+| `CHANGELOG.md` | One-line summary per release, 0.1.0-alpha → 0.8.0-beta; ⚠️ marks breaking changes and upgrade actions |
 | `docs/setup.md` | Server install: Docker, Compose, Windows, Linux, macOS, Kubernetes notes, first sign-in, troubleshooting |
-| `docs/agent-onboarding.md` | Supervisor install/enrollment, `supervisor.yaml` reference, sidecar, ZeroTouch discovery |
+| `docs/agent-onboarding.md` | Add collector command, installer options, existing collectors, MSI, labels, unprivileged mode, `supervisor.yaml` reference, sidecar, discovery |
+| `docs/enterprise-deployment.md` | Hosts that already run a collector, machine images, air-gapped sites (summary; full guides on collectorctrl.com/docs) |
 | `docs/configuration.md` | Server env-var reference, TLS modes, data dir, dev-only switches |
-| `docs/upgrading.md` | Upgrade order, breaking changes 0.5.x/0.6.x, backup/restore commands |
-| `docs/features.md` | Full capability list as of v0.6.3-beta |
+| `docs/upgrading.md` | Upgrade order, changes to check 0.5.x to 0.8.x, backup/restore commands |
+| `docs/features.md` | Full capability list as of v0.8.0-beta |
 | `docs/ai-copilot-and-mcp.md` | Approval model, providers, MCP endpoint, tool list, runbook prompts |
 | `docs/gitops.md` | GitHub/GHE sync, repo layout, `TelemetryPolicy` file format, webhook, API |
 | `docs/architecture.md` | Components, config flow, identity, ports |
 | `docs/security.md` | Transport, identity, auth, SSO, RBAC, AI guardrails, signing, audit, hardening checklist |
-| `docs/verifying-downloads.md` | `.sig` format, release key history, verification, SBOMs |
+| `docs/verifying-downloads.md` | `.sig` format, release key history, verification, checks at install time, SBOMs |
 | `docs/api/openapi.json` | REST API spec (~15k lines) |
 | `examples/docker-compose.yml` | Production-mode server + PostgreSQL |
 | `examples/gitops/templates/linux-hosts-production.yaml` | Example `TelemetryPolicy` |
@@ -156,17 +159,21 @@ There is no lint, link check or test suite. Release assets and the image are pro
 
 | Group | Variables |
 | --- | --- |
-| Core | `COLLECTORCTRL_MODE`, `COLLECTORCTRL_ADMIN_PASSWORD`, `COLLECTORCTRL_DATA_DIR` |
+| Core | `COLLECTORCTRL_MODE`, `COLLECTORCTRL_ADMIN_PASSWORD`, `COLLECTORCTRL_DATA_DIR`, `COLLECTORCTRL_PACKAGES_DIR`, `COLLECTORCTRL_AGENT_ASSETS_DIR`, `COLLECTORCTRL_BACKUP_DIR` |
 | Database | `COLLECTORCTRL_DB_TYPE`, `COLLECTORCTRL_DB_DSN` |
 | TLS | `COLLECTORCTRL_UI_TLS`, `COLLECTORCTRL_UI_HTTPS` (legacy), `COLLECTORCTRL_UI_CERT`, `COLLECTORCTRL_UI_KEY`, `COLLECTORCTRL_TLS_CERT`, `COLLECTORCTRL_TLS_KEY`, `COLLECTORCTRL_TLS_CA`, `COLLECTORCTRL_OPAMP_TLS`, `COLLECTORCTRL_OPAMP_BEHIND_PROXY` |
-| Network | `COLLECTORCTRL_UI_ADDR`, `COLLECTORCTRL_OPAMP_ADDR`, `COLLECTORCTRL_URL`, `COLLECTORCTRL_ADVERTISE_HOST`, `COLLECTORCTRL_OPAMP_ENDPOINT`, `COLLECTORCTRL_ALLOWED_ORIGIN`, `COLLECTORCTRL_TRUST_PROXY_HEADERS` |
+| Network | `COLLECTORCTRL_UI_ADDR`, `COLLECTORCTRL_OPAMP_ADDR`, `COLLECTORCTRL_URL`, `COLLECTORCTRL_ADVERTISE_HOST`, `COLLECTORCTRL_OPAMP_ENDPOINT`, `COLLECTORCTRL_UI_URL`, `COLLECTORCTRL_ALLOWED_ORIGIN`, `COLLECTORCTRL_CSP`, `COLLECTORCTRL_CSP_REPORT_ONLY`, `COLLECTORCTRL_TRUST_PROXY_HEADERS` |
 | Secrets | `COLLECTORCTRL_JWT_SECRET`, `COLLECTORCTRL_ENCRYPTION_KEY`, `COLLECTORCTRL_TAP_TOKEN_SECRET`, `OPAMP_SHARED_SECRET`, `OPAMP_SHARED_SECRET_PREVIOUS` |
 | Agent auth | `OPAMP_LEGACY_MODE` |
 | OIDC bootstrap | `COLLECTORCTRL_OIDC_ISSUER`, `_CLIENT_ID`, `_CLIENT_SECRET`, `_REDIRECT_URL`, `_ROLES_ADMIN`, `_ROLES_EDITOR`, `_ROLES_VIEWER` |
 | AI / MCP | `COLLECTORCTRL_MCP_AUTO_APPROVE` |
-| Other | `COLLECTORCTRL_OTLP_AUDIT_INSECURE`, `COLLECTORCTRL_ASSET_ALLOWED_HOSTS`, `COLLECTORCTRL_GOVERNOR_MAX_PAYLOAD_BYTES`, `COLLECTORCTRL_FRONTEND_DIR` |
-| Supervisor host | `COLLECTORCTRL_ENROLL_TOKEN`, `OPAMP_SHARED_SECRET` (legacy) |
-| Dev only | `OPAMP_AUTH_DISABLED`, `COLLECTORCTRL_ALLOW_UNSIGNED_PACKAGES` |
+| Governance | `COLLECTORCTRL_GOVERNOR_QUERY_SCAN_LIMIT`, `_RETENTION_DAYS`, `_MAX_PAYLOAD_BYTES`, `_MAX_DECODED_BYTES`, `_MAX_CONCURRENT_INGEST`, `_RATE_LIMIT_PER_MIN`, `_DAILY_QUOTA_BYTES`, `_INGEST_WORKERS`, `_INGEST_QUEUE_BATCHES`, `_INGEST_QUEUE_RECORDS`, `_WORKERS`, `_QUEUE_SIZE`, `_QUEUE_MAX_BYTES` |
+| Logging / metrics | `COLLECTORCTRL_LOG_FORMAT`, `COLLECTORCTRL_LOG_LEVEL`, `COLLECTORCTRL_HTTP_ACCESS_LOG`, `COLLECTORCTRL_DEBUG`, `COLLECTORCTRL_METRICS_TOKEN` |
+| Packages / builds | `COLLECTORCTRL_PACKAGE_SYNC`, `COLLECTORCTRL_PACKAGE_SYNC_REPO`, `COLLECTORCTRL_COLLECTOR_PACKAGE_KEY`, `COLLECTORCTRL_MAX_PARALLEL_UPGRADES`, `COLLECTORCTRL_WAVE_BAKE_SECONDS`, `COLLECTORCTRL_OCB_TIMEOUT`, `COLLECTORCTRL_OCB_CACHE_DIR` |
+| Other | `COLLECTORCTRL_OTLP_AUDIT_ENDPOINT`, `COLLECTORCTRL_OTLP_AUDIT_INSECURE`, `COLLECTORCTRL_AUDIT_RETENTION_DAYS`, `COLLECTORCTRL_ASSET_ALLOWED_HOSTS`, `COLLECTORCTRL_FRONTEND_DIR` |
+| Supervisor host | `COLLECTORCTRL_ENROLL_TOKEN`, `COLLECTORCTRL_PACKAGE_MAX_DOWNLOAD_BYTES`, `COLLECTORCTRL_PACKAGE_DOWNLOAD_TIMEOUT`, `COLLECTORCTRL_ASSET_MAX_DOWNLOAD_BYTES`, `COLLECTORCTRL_ASSET_DOWNLOAD_TIMEOUT`, `COLLECTORCTRL_SYSTEMD_UNIT`, `OPAMP_SHARED_SECRET` / `COLLECTORCTRL_OPAMP_SECRET` (legacy) |
+| Dev only | `OPAMP_AUTH_DISABLED`, `COLLECTORCTRL_ALLOW_UNSIGNED_PACKAGES`, `COLLECTORCTRL_ALLOW_INSECURE_GOVERNOR_INGEST`, `COLLECTORCTRL_GIT_ALLOW_LOOPBACK` |
+| In the product source but not documented here | `COLLECTORCTRL_MAX_AGENTS`, `COLLECTORCTRL_TENANT_ID`, `COLLECTORCTRL_VERSION`, `COLLECTORCTRL_CLICKHOUSE_*` |
 | Compose | `POSTGRES_PASSWORD` |
 
 ## 6. Domain concepts
@@ -184,18 +191,29 @@ There is no lint, link check or test suite. Release assets and the image are pro
 | Enrollment token / per-agent credential / API token | `cce_…` (expires, limited uses) / `cca_…` (bound to instance UID) / `cc_…` (role + optional environment scope) |
 | Pending AI action | Proposal from Copilot/MCP awaiting human approval |
 | Blast radius | Number of collectors a proposal would affect |
-| Telemetry Governor | Taps → Insights → optimizer → destinations |
+| Governance / Telemetry Governor | **Governance** is the side-menu section (called Telemetry before v0.8.0-beta); Telemetry Governor is the engine: taps → Insights → optimizer → destinations, one global sampling rate |
+| Instrumentation | Side-menu section for ZeroTouch (separate from Governance since v0.8.0-beta) |
+| Add collector | The onboarding dialog (called Get Started before v0.8.0-beta) |
+| Label | `key=value` set at install time, reported as a collector attribute; `deployment.environment` sets the environment |
+| Takeover | Supervisor installer stops and disables a collector's own service and runs the same binary and config itself |
+| Package mirror | `/packages/` on the server; serves supervisor packages to install commands; keeps only release-signed packages |
 | ZeroTouch | Application discovery + OTel agent attach (Java, .NET, Node.js, Python); alpha |
 | Legacy mode | Shared-secret agent auth kept only as a migration window |
 | Data directory | Per-install CA, keys, secrets; losing it forces re-enrollment |
 
-Terminology note: the product UI and docs still use "agent" in fixed labels (Agent Enrollment, per-agent credential,
+UI vocabulary (v0.8.0-beta): the side menu is Overview, Fleet, Rollouts, Catalog (Templates, Packages, Custom builds),
+Governance (Sources, Insights, Destinations, Configuration), Instrumentation, Settings, Docs & API. Settings items:
+Users, Roles & permissions, Single sign-on, Tokens, Classification rules, Supervisors, Git, Alert channels,
+Email (SMTP), Model & provider, Pending approvals, Database, License, Audit log, API reference. Leave historical
+changelog rows as they were written.
+
+Terminology note: the product UI and docs still use "agent" in fixed labels (per-agent credential,
 `fleet_*_agent` tool names). Keep those exact when referencing UI/API names; otherwise write "collectors".
 
 ## 7. Conventions
 
-- **Docs style** (as practised in recent PRs): plain, short sentences; tables over prose; bold for UI labels; UI paths as **Settings → X**; `<version>` / `<arch>` placeholders; `example.com` hosts; `cc_your_token`-style placeholders.
-- **Every version-specific statement names its version** ("since v0.5.3-beta", "v0.6.3-beta (23 October 2026)"). README banner, `features.md`, `SECURITY.md`, `RELEASE_NOTES.md` and `CHANGELOG.md` must move together on each release.
+- **Docs style** (as practised in recent PRs): plain, short sentences; tables over prose; bold for UI labels; UI paths as **Settings → X**, **Governance → Configuration**; `<version>` / `<arch>` placeholders; `example.com` hosts; `cc_your_token`-style placeholders.
+- **Every version-specific statement names its version** ("since v0.5.3-beta", "v0.8.0-beta (12 November 2026)"). README banner, `features.md`, `SECURITY.md`, `RELEASE_NOTES.md` and `CHANGELOG.md` must move together on each release.
 - **Breaking changes**: ⚠️ in CHANGELOG plus a section in `docs/upgrading.md` ("Changes to check in 0.X.x").
 - **Feature maturity labels**: Beta / Alpha / Pilot / Not yet available (README table). Mark non-beta features in headings, e.g. *(alpha)*, *(pilot)*.
 - **Security posture in docs**: secure defaults first; every weakening switch is labelled "development only" or "testing only".
@@ -210,21 +228,25 @@ Terminology note: the product UI and docs still use "agent" in fixed labels (Age
 
 | Status | Features |
 | --- | --- |
-| Beta | Fleet management, policies and canary rollouts, drift prevention, config history, GitOps, sidecars, supervisor/collector upgrades, package signing, Custom Builder, AI Copilot, MCP server, Telemetry Governor, SSO and RBAC, audit and SIEM streaming |
-| Alpha | ZeroTouch instrumentation (.NET partial) |
+| Beta | Fleet management, policies and canary rollouts, drift prevention, config history, GitOps, sidecars, supervisor/collector upgrades, package signing, Custom Builder, AI Copilot, MCP server, Governance (Telemetry Governor), SSO and RBAC, audit and SIEM streaming |
+| Alpha | Instrumentation / ZeroTouch (.NET partial) |
 | Pilot | Kubernetes workload observation (read-only) |
 | Not yet available | Multi-replica HA; managing Kubernetes workload config |
 
-Documented gaps: `collectorctrl-mcp` adapter not in release downloads; Windows installers have no SBOM in 0.6.3;
-SBOM signing, npm/PostgreSQL SBOM contents and Docker image SBOM/cosign promised "from the next release"; GitOps
-supports one repository and GitHub/GHE only; load-tested to 1,000 collectors.
+Documented gaps: `collectorctrl-mcp` adapter not in release downloads (none in the v0.8.0-beta assets); the
+v0.8.0-beta release page has no supervisor `.deb` / `.rpm` although the release notes describe them; the Ansible
+role and Packer / cloud-init / Terraform examples are not in this repository; Windows setup programs and MSI not
+Authenticode-signed; macOS collector takeover not run on a Mac; signature check only in the one-line install
+commands; unprivileged mode is Linux/systemd only; supervisor upgrade queue kept in memory; Governance not
+load-tested; GitOps supports one repository and GitHub/GHE only; load-tested to 1,000 collectors.
 
 TODO/FIXME: none in this repo.
 
 ### Recent direction (git log)
 
+- Nov 2026: docs brought up to v0.8.0-beta (0.6.4, 0.7.x and 0.8.0 changes), `docs/enterprise-deployment.md` added.
 - Oct 2026: docs refreshed for v0.6.3-beta, licensing clarified, SBOM section added (PRs #1–#3).
-- Releases accelerated from v0.5.1 (28 Sep) to v0.6.3 (23 Oct): security-by-default (0.5.x), Kubernetes visibility (0.6.x).
+- Releases accelerated from v0.5.1 (28 Sep) to v0.8.0 (12 Nov): security-by-default (0.5.x), Kubernetes visibility (0.6.x), hardening and scale (0.7.x), enterprise installation and Governance (0.8.x).
 - Mid-2026: Telemetry Governor deploy files, Helm values and a K8s code folder were added and later removed from this repo.
 
 ### Claims to check against the product
@@ -232,18 +254,20 @@ TODO/FIXME: none in this repo.
 These are statements users will rely on; confirm each in the server source before GA:
 
 - [ ] Load-tested with 1,000 collectors; < 135 MB server memory on SQLite and PostgreSQL (Aug 2026)
-- [ ] "60+" MCP tools and 5 runbook prompts; responses capped at 120 KB
-- [ ] Blast-radius default 10; proposal expiry 15 min; API tokens can't approve
+- [x] MCP: more than 60 tools, 7 runbook prompts; responses capped at 120 KB (checked in source, v0.8.0-beta)
+- [ ] Blast-radius default 10; API tokens can't approve (proposal expiry 15 min checked in source)
 - [ ] Per-install CA ECDSA P-256 10 years; server cert 825 days, renewed within 30 days
 - [ ] Enrollment token default expiry 24 h
 - [ ] GitOps sync default 60 s; webhook needs `X-Hub-Signature-256`
-- [ ] Governor tap default 10%; > 10,000 patterns returns 422
+- [x] Governor global sampling default 10%; query scan limit 100,000; query cache 30 s (checked in source, v0.8.0-beta)
+- [ ] Governor: > 10,000 patterns returns 422
 - [ ] Notification grouping above 5 per environment; 250 notifications kept per environment
 - [ ] Supervisor accepts only release-signed supervisor packages
 - [ ] OpAMP frame limit 16 MB
-- [ ] macOS server and Supervisor (`.tar.gz`) and the Windows arm64 installers exist for every release
-- [ ] OpenAPI `info.version` 1.4.0 matches the server's `/api/docs/openapi.json` for v0.6.3-beta
-- [ ] Image publishes immutable `main-<commit>` tags (stated in `setup.md`)
+- [x] macOS server and Supervisor (`.tar.gz`), Windows amd64 and arm64 installers and MSI exist in the v0.8.0-beta assets
+- [ ] Windows server install directory (`C:\Program Files\CollectorCtrl`): the setup program's own installation of the Supervisor is documented in the product source as `C:\Program Files (x86)\CollectorCtrl Supervisor`
+- [ ] `docs/api/openapi.json` matches the server's `/api/docs/openapi.json` for v0.8.0-beta (not regenerated in the v0.8.0-beta docs update)
+- [ ] Versioned image tags per release (stated in `setup.md`, from the v0.6.4-beta notes)
 
 ## 9. Gotchas
 
@@ -252,13 +276,15 @@ These are statements users will rely on; confirm each in the server source befor
 - **`RELEASE_NOTES.md` holds only the latest release**; older notes are on GitHub Releases. CHANGELOG links every tag.
 - **Docker volume**: losing `/var/lib/collectorctrl` creates a new CA and locks out every enrolled collector. Never mount over `/opt/collectorctrl`.
 - **Production mode** refuses to start without `COLLECTORCTRL_JWT_SECRET` and `COLLECTORCTRL_ENCRYPTION_KEY`, and refuses plaintext listeners on non-loopback addresses.
-- **Windows**: config via the service's registry `Environment` value; data in `%PROGRAMDATA%\CollectorCtrl` (restrict ACLs); onboarding needs `curl.exe`; service names `CollectorCtrl` / `CollectorCtrlSupervisor`; server binary is `server.exe`.
-- **Linux/macOS**: data dir defaults to the working directory unless `COLLECTORCTRL_DATA_DIR` is set; services `collectorctrl` / `collectorctrl-supervisor`; launchd `com.collectorctrl.supervisor`.
-- **Kubernetes**: server single replica, PVC at `/var/lib/collectorctrl`, HTTPS probes on `/api/health`. Observer needs `opamp.enrollmentSecret`, retained PVC, one replica.
+- **Windows**: config via the service's registry `Environment` value; data in `%PROGRAMDATA%\CollectorCtrl` (restrict ACLs); onboarding needs `curl.exe`; service names `CollectorCtrl` / `CollectorCtrlSupervisor`; server binary is `server.exe`; the Supervisor writes `supervisor.log` next to its executable; the MSI and the setup program are separate installations and do not mix.
+- **Admin password**: only a non-production start without `COLLECTORCTRL_ADMIN_PASSWORD` (e.g. the README's `docker run`) still creates `admin` / `admin`. Never describe that as the general default.
+- **Linux/macOS**: data dir defaults to the working directory unless `COLLECTORCTRL_DATA_DIR` is set; the unit reads `/etc/collectorctrl/server.env`; services `collectorctrl` / `collectorctrl-supervisor`; launchd `com.collectorctrl.supervisor`.
+- **Kubernetes**: server single replica, PVC at `/var/lib/collectorctrl`, HTTPS probes on `/api/health` and `/readyz`. Observer needs `opamp.enrollmentSecret`, retained PVC, one replica.
 - **Environment names** became case-insensitive in 0.6.3; unclassified is `unknown`, but Governor S3 paths still use `environment=default`.
 - **Policy/canary/GitOps MCP proposals** need an unscoped token.
 - **Backups exclude env-supplied secrets** and the PostgreSQL database (take `pg_dump` too).
-- **Image versioning**: README quick start uses `:latest`; there's no documented versioned image tag scheme beyond `main-<commit>`.
+- **Image versioning**: README quick start uses `:latest`; releases publish versioned tags since v0.6.4-beta.
+- **Release notes vs. assets**: check `gh release view <tag> --json assets` before documenting a download. The v0.8.0-beta notes describe `.deb` / `.rpm` packages that are not on the release page.
 - **Docs mention `collectorctrl.com/docs`** as the canonical docs site; this repo and the site can drift.
 
 ## 10. Open questions
@@ -268,7 +294,9 @@ These are statements users will rely on; confirm each in the server source befor
 3. Is the collectorctrl.com docs site generated from this `docs/` folder, or maintained separately?
 4. Should this repo get a link checker / Markdown lint workflow?
 5. When will `collectorctrl-mcp` ship in release downloads?
-6. Version alignment: server 0.6.3-beta vs K8s operator 0.7.0 (chart 0.3.0). Is there a compatibility table?
+6. Version alignment: server 0.8.0-beta vs K8s operator (readiness needs 0.8.0, rollout state 0.9, settings table 0.9.1). Is there a compatibility table?
+10. Where do public users get the Ansible role and the Packer / cloud-init / Terraform examples, and will `.deb` / `.rpm` packages be attached to a release?
+11. `CLAUDE.md` points to `AGENTS.md`, which was deleted.
 7. GA target Jan–Feb 2027: which "Beta" features are expected to reach GA, and does Kubernetes observation leave "pilot"?
 8. `SECURITY.md` here and in the operator repo list different reporting channels. Intended?
 9. The PR template asks about coding standards and DB migrations, which don't apply to a docs-only repo. Keep or split?

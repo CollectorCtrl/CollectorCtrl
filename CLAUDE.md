@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Read [AGENTS.md](AGENTS.md) first; it holds the commands, conventions and "don't change without asking" rules for
-this repository. Full background is in [CONTEXT.md](CONTEXT.md).
+Read [CONTEXT.md](CONTEXT.md) first: it holds the background, conventions and the rules for changing the documents in
+this repository.
 
-@AGENTS.md
+@CONTEXT.md

@@ -18,7 +18,7 @@ Deploy, configure, govern and upgrade your entire OpenTelemetry Collector fleet 
 
 ---
 
-> **Public beta.** The current release is **v0.6.3-beta** (23 October 2026). CollectorCtrl is free to use and self-hosted. Betas can include breaking changes: read the [release notes](RELEASE_NOTES.md) before upgrading, and see [what's stable](#feature-maturity) before planning production use.
+> **Public beta.** The current release is **v0.8.0-beta** (12 November 2026). CollectorCtrl is free to use and self-hosted. Betas can include breaking changes: read the [release notes](RELEASE_NOTES.md) before upgrading, and see [what's stable](#feature-maturity) before planning production use.
 
 ## Why CollectorCtrl
 
@@ -32,18 +32,19 @@ OpenTelemetry made the data plane vendor-neutral. The fleet that runs it usually
 
 | | |
 | :--- | :--- |
-| **Fleet management over OpAMP** | Live inventory of every collector on Windows, Linux, macOS and containers: health, version, effective config, attributes. Table, honeycomb and topology views, classified by environment and role. |
+| **Fleet management over OpAMP** | Live inventory of every collector on Windows, Linux, macOS and containers: health, version, effective config, attributes. List, map and topology views, classified by environment and role. |
 | **Kubernetes workloads** *(pilot)* | See the collector Deployments, DaemonSets and StatefulSets you deploy with Helm or GitOps next to host collectors, read-only, via the [Kubernetes observer](https://github.com/CollectorCtrl/CollectorCtrl-K8s-Operator). |
 | **Policy-driven configuration** | Label-selector policies, SHA-256-versioned configs, canary rollouts with promote and abort, one-click rollback, full configuration history with diffs. |
 | **Drift prevention** | Each agent reports its effective config hash. Drift is flagged or reverted automatically, per policy. |
 | **Self-healing collectors** | Every new config is validated by the collector before it's applied. A config that crash-loops the collector is rolled back to the last known good one. |
 | **GitOps** | Keep policies in GitHub or GitHub Enterprise. Changes arrive as pull requests, sync within seconds via webhook, and drift is shown side by side. |
 | **AI Copilot** | Answers from live fleet data, streams its reasoning steps, and proposes changes with a diff and blast radius. **It never applies a change on its own.** A person approves every one. |
-| **MCP server** | 60+ governed tools and 5 runbook prompts for Claude Desktop, Cursor or any MCP client. Same RBAC, audit and approval workflow as the UI. |
+| **MCP server** | 60+ governed tools and 7 runbook prompts for Claude Desktop, Cursor or any MCP client. Same RBAC, audit and approval workflow as the UI. |
 | **Sidecar pipelines** | Run a second, isolated collector beside the main one, for example to keep a SIEM pipeline running while you change the observability pipeline. |
-| **Supervisor and collector lifecycle** | Signed package repository, fleet-wide supervisor and collector upgrades with watchdogs and automatic rollback, and an integrated Custom Builder (`ocb`). |
-| **ZeroTouch instrumentation** *(alpha)* | Discover applications on managed hosts and attach OpenTelemetry agents (Java, .NET, Node.js, Python) from the UI, with canary rollout and centrally managed agent versions. |
-| **Telemetry Governor** | Edge taps sample telemetry at the collector, Insights ranks the recurring patterns behind your volume, and the optimizer turns them into validated filter or sampling rules rolled out by policy. Fan out to S3 or OTLP destinations. |
+| **Supervisor and collector lifecycle** | Signed package repository, fleet-wide collector upgrades with watchdogs and automatic rollback, supervisor upgrades that start with a canary cohort, and an integrated Custom Builder (`ocb`). |
+| **Installation for existing estates** | Supervisor installers take over a collector that already runs as its own service. An MSI for SCCM, Intune and Group Policy, and installer options for enrollment, the server CA, labels, machine images and air-gapped sites. See [Enterprise deployment scenarios](docs/enterprise-deployment.md). |
+| **Instrumentation** *(alpha)* | Discover applications on managed hosts and attach OpenTelemetry agents (Java, .NET, Node.js, Python) from the UI, with canary rollout and centrally managed agent versions. For Kubernetes, see which APM agent each workload runs and what stands between it and OpenTelemetry. |
+| **Governance** | Edge taps sample telemetry at the collector at one global rate (default 10%), Insights ranks the recurring patterns behind your volume, and the optimizer turns them into validated filter or sampling rules rolled out by policy. Fan out to S3 or OTLP destinations. |
 | **Enterprise security** | Per-agent enrollment and credentials, TLS by default with a per-install CA, OIDC SSO, granular RBAC with environment-scoped tokens, tamper-evident audit trail streamed to your SIEM over OTLP. |
 | **Alerting by environment** | Notifications filtered per environment, and alert channels (email, Slack, Microsoft Teams, PagerDuty, webhooks) routed by environment, with one summary alert instead of hundreds during an outage. |
 
@@ -70,15 +71,19 @@ For production with PostgreSQL, use the [Docker Compose example](examples/docker
 
 ### 2. Sign in
 
-Open **`https://<server>:4321`** and sign in as `admin` / `admin`. You'll be asked to set a new password straight away.
+Open **`https://<server>:4321`** and sign in as `admin`.
+
+- **Windows and Linux installers:** you choose the administrator password during installation, or the installer generates one and shows it once.
+- **Production mode** (`COLLECTORCTRL_MODE=production`, used by the Compose example): set `COLLECTORCTRL_ADMIN_PASSWORD` before the first start, or read the one-time password from the server log.
+- **The evaluation `docker run` above** sets neither, so the first sign-in is `admin` / `admin` and you must choose a new password before doing anything else. Don't expose it to a network in that state.
 
 The UI is served over **HTTPS by default**, using a certificate from the CA that the server creates on first start. Your browser will warn that it doesn't recognize this CA until you trust it or [use your own certificate](docs/configuration.md#tls).
 
 ### 3. Connect collectors
 
-In the UI, open **Get Started**, create an **enrollment token**, and run the one-line command it shows on each host (Linux, Windows or macOS). The script installs the CollectorCtrl Supervisor, pins the server's CA fingerprint, and enrolls the host with its own credential. Collectors appear in **Fleet** within seconds.
+In the UI, click **Add collector**, create an **enrollment token**, and run the one-line command it shows on each host (Linux, Windows or macOS). The script pins the server's CA fingerprint, downloads the CollectorCtrl Supervisor, checks the package against its release signature when the server has one, and enrolls the host with its own credential. If the host already runs a collector as its own service, the Supervisor takes it over. Collectors appear in **Fleet** within seconds.
 
-Details: [Connecting collectors](docs/agent-onboarding.md).
+Details: [Connecting collectors](docs/agent-onboarding.md) · [Enterprise deployment scenarios](docs/enterprise-deployment.md).
 
 ## Architecture
 
@@ -108,33 +113,34 @@ More detail: [docs/architecture.md](docs/architecture.md).
 
 | | Server | Supervisor | Release asset |
 | :--- | :---: | :---: | :--- |
-| Windows (amd64, arm64) | ✅ | ✅ | `.exe` installers (SQLite or PostgreSQL edition for the server) |
+| Windows (amd64, arm64) | ✅ | ✅ | `.exe` installers (SQLite or PostgreSQL edition for the server); supervisor `.msi` |
 | Linux (amd64, arm64) | ✅ | ✅ | `.tar.gz` with `install.sh` and a systemd unit |
 | macOS (amd64, arm64) | ✅ | ✅ | `.tar.gz` |
 | Docker | ✅ | — | `ghcr.io/collectorctrl/collectorctrl-server` |
 | Kubernetes | Single replica | Observation pilot via the [K8s observer](https://github.com/CollectorCtrl/CollectorCtrl-K8s-Operator) | See [setup notes](docs/setup.md#kubernetes) |
 
-Every release file has a detached `.sig` signature, and server and supervisor binaries have an SPDX SBOM (`.spdx.json`). See [Verifying downloads](docs/verifying-downloads.md).
+Every release file has a detached `.sig` signature and an SPDX SBOM (`.spdx.json`). The v0.8.0-beta release notes describe supervisor `.deb` and `.rpm` packages; the [v0.8.0-beta release page](https://github.com/CollectorCtrl/CollectorCtrl/releases/tag/v0.8.0-beta) does not list any, so use the `.tar.gz` on Linux. See [Verifying downloads](docs/verifying-downloads.md).
 
 ## Feature maturity
 
 | Status | Features |
 | :--- | :--- |
-| **Beta** | Fleet management, policies and canary rollouts, drift prevention, configuration history, GitOps, sidecar collectors, supervisor and collector upgrades, package signing, Custom Builder, AI Copilot, MCP server, Telemetry Governor, SSO and RBAC, audit and SIEM streaming |
-| **Alpha** | ZeroTouch instrumentation |
+| **Beta** | Fleet management, policies and canary rollouts, drift prevention, configuration history, GitOps, sidecar collectors, supervisor and collector upgrades, package signing, Custom Builder, AI Copilot, MCP server, Governance (Telemetry Governor), SSO and RBAC, audit and SIEM streaming |
+| **Alpha** | Instrumentation (ZeroTouch) |
 | **Pilot** | Kubernetes workload observation (read-only) |
 | **Not yet available** | Multi-replica high availability (run a single server), managing Kubernetes workload configuration from CollectorCtrl |
 
-CollectorCtrl has been load-tested with up to 1,000 collectors on a single server. If you plan a larger fleet, [get in touch](mailto:connect@collectorctrl.com).
+CollectorCtrl has been load-tested with up to 1,000 collectors on a single server. Governance has not been load-tested: sampled records are stored one row per record in the server's database, and no capacity figure for large fleets is published yet. If you plan a larger fleet, [get in touch](mailto:connect@collectorctrl.com).
 
 ## Documentation
 
 | Guide | |
 | :--- | :--- |
 | [Installation](docs/setup.md) | Docker, Compose, Windows, Linux, macOS, Kubernetes notes, first sign-in |
-| [Connecting collectors](docs/agent-onboarding.md) | Enrollment, the Supervisor, `supervisor.yaml`, sidecars, vendor collectors |
+| [Connecting collectors](docs/agent-onboarding.md) | Enrollment, the Supervisor, installer options and packages, `supervisor.yaml`, sidecars, vendor collectors |
+| [Enterprise deployment scenarios](docs/enterprise-deployment.md) | Hosts that already run a collector, machine images, air-gapped sites |
 | [Configuration reference](docs/configuration.md) | Environment variables, TLS modes, data directory, ports |
-| [Upgrading, backup and restore](docs/upgrading.md) | Upgrade checklist, breaking changes in 0.5.x and 0.6.x, backup/restore |
+| [Upgrading, backup and restore](docs/upgrading.md) | Upgrade checklist, changes to check in 0.5.x to 0.8.x, backup/restore |
 | [Features](docs/features.md) | Everything CollectorCtrl does today |
 | [AI Copilot and MCP](docs/ai-copilot-and-mcp.md) | Model providers, approvals, MCP tools, connecting Claude Desktop or Cursor |
 | [GitOps](docs/gitops.md) | Managing fleet policies in a GitHub repository |

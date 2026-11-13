@@ -13,8 +13,8 @@ Both follow one rule: **AI can read and propose; only a person can approve a cha
 
 1. Any tool that would change state (push a config, restart a collector, save a policy, promote a canary, open a pull request…) creates a **pending action** instead of running.
 2. The proposal records the exact change, a diff where relevant, and its **blast radius**: how many collectors it would affect.
-3. A signed-in person reviews it in **Settings → Pending AI Actions** and approves or rejects it.
-4. The approver needs the `mcp:approve` permission **and** the permission and environment scope of the underlying action. With **Four-Eyes Approval** enabled, the proposer can't approve their own action.
+3. A signed-in person reviews it under **Rollouts → Approvals** and approves or rejects it. A configuration change is shown as a unified diff against the current configuration.
+4. The approver needs the `mcp:approve` permission **and** the permission and environment scope of the underlying action. With **four-eyes approval** enabled (the default for new installs since v0.7.0-beta), the proposer can't approve their own action. Only admins can change the MCP governance settings.
 5. At approval time the proposal is checked again (a policy edited in the meantime isn't overwritten), and the action runs at most once. Proposals expire after 15 minutes.
 
 There is no MCP tool for approving, and the approval endpoint rejects API tokens, so an AI client can never approve its own proposal. Proposals that would affect more collectors than the configured limit (10 by default) are refused until an administrator raises it.
@@ -27,14 +27,15 @@ Unattended automation can be allowed explicitly: it needs `COLLECTORCTRL_MCP_AUT
 
 Open the Copilot from anywhere in the UI, or from the configuration editor with a collector's config already attached.
 
-- **Answers from live data:** fleet health, collector details and logs, configurations and history, templates and drift, policies and rollouts, audit, and Telemetry Governor analytics.
+- **Answers from live data:** fleet health, collector details and logs, configurations and history, templates and drift, policies and rollouts, audit, Governance analytics, and Kubernetes instrumentation readiness.
 - **Shows its work:** answers stream in live, and each tool call appears as a step.
 - **Fast to drive:** `/` slash commands, `@` mentions of collectors, policies and pipelines, edit-and-regenerate, and a panel you can dock beside your work.
 - **Proposes changes** with diffs and blast radius, for approval as described above.
+- **Same controls as MCP:** the MCP kill switch stops the Copilot, its calls are rate-limited, and every tool call is in the audit log. Tool output is passed to the model as data, never as instructions.
 
 ### Model providers
 
-Configure the model in **Settings → AI**:
+Configure the model in **Settings → Model & provider**:
 
 | Provider | Notes |
 | :--- | :--- |
@@ -50,7 +51,7 @@ Settings include **PII redaction** and optional web search. API keys are encrypt
 ## MCP server
 
 - **Endpoint:** `POST https://<server>:4321/api/mcp` (JSON-RPC 2.0 over HTTPS)
-- **Auth:** `Authorization: Bearer <API token>`. Create a token under **Settings → SSO & Tokens → API Tokens** and give it the least-privileged role that works.
+- **Auth:** `Authorization: Bearer <API token>`. Create a token under **Settings → Tokens** and give it the least-privileged role that works.
 - **Audit:** every call is logged with actor `mcp:<username>`, the tool, its arguments and its duration.
 - **Capabilities:** tools and prompts.
 
@@ -97,14 +98,17 @@ Read tools need the same permission as the matching API route. Tools marked **ap
 | Templates and drift | `templates_list`, `templates_get_agents`, `templates_drift` |
 | GitOps | `git_drift`, `git_list_prs`; **approval:** `git_propose_change` |
 | Sidecar | `sidecar_get_config`; **approval:** `sidecar_save_config` |
-| Upgrades and packages | `fleet_list_packages`, `fleet_get_build_status`, `upgrades_status`, `supervisors_list`, `supervisors_check_updates` |
-| Telemetry Governor | `governor_volume`, `governor_cardinality`, `governor_templates`, `governor_engine_status`, `governor_top_patterns`, `governor_optimize_preview`, `governor_optimize_config`, `governor_optimize_explain_checks`, `destinations_list`, `destination_test`; **approval:** `governor_set_sampling`, `governor_toggle_tap` |
+| Upgrades and packages | `fleet_list_packages`, `fleet_get_build_status`, `upgrades_status`, `supervisors_list`, `supervisors_check_updates`; **approval:** `fleet_upgrade_agent`, `supervisor_upgrade` |
+| Governance (Telemetry Governor) | `governor_volume`, `governor_cardinality`, `governor_templates`, `governor_engine_status`, `governor_top_patterns`, `governor_optimize_preview`, `governor_optimize_config`, `governor_optimize_explain_checks`, `destinations_list`, `destination_test`; **approval:** `governor_toggle_tap` |
 | Discovery and instrumentation | `discovery_reports`, `instrumentation_list_apps`, `instrumentation_get_rollout_status`, `instrumentation_get_version_policy`; **approval:** `supervisor_set_discovery` and the instrumentation version and pinning tools |
+| Kubernetes | `k8s_instrumentation_readiness` |
 | Classification | `env_rules_list`, `env_rules_preview` |
 | Proposals | `actions_get_status`, `actions_list_mine` |
 | Audit | `audit_query` |
 
 Run `tools/list` against your server for the authoritative list, with input schemas.
+
+`governor_set_sampling` was removed in v0.8.0-beta: the sampling rate is one global setting under **Governance → Configuration**, and there is no MCP tool for it. A proposal for the old tool created before the upgrade fails when approved.
 
 ### Runbook prompts
 
@@ -115,6 +119,8 @@ Run `tools/list` against your server for the authoritative list, with input sche
 | `safe_fleet_config_change` | Roll out a change with validation, a canary and verification |
 | `sidecar_troubleshoot` | Diagnose a failing sidecar without touching the main collector |
 | `optimize_telemetry_volume` | Find noisy log patterns or span routes, build a validated filter or sampling rule, and propose it through a policy |
+| `inspect_kubernetes_workload` | Inspect one observed Kubernetes workload |
+| `plan_kubernetes_otel_adoption` | Walk through a cluster's instrumentation readiness and end with a plan |
 
 **Recommended agent workflow:** read state → validate → propose through a policy or pull request (canary for risky changes) → poll `actions_get_status` until it resolves → verify → report.
 
@@ -122,6 +128,7 @@ Run `tools/list` against your server for the authoritative list, with input sche
 
 - Policy, canary and GitOps proposals need an **unscoped** token, because a policy can match collectors in any environment.
 - For changes meant for more than one collector, prefer `policy_save` or `git_propose_change` over per-collector `fleet_push_config`.
+- A policy that adds or changes an optimizer drop, sample or trace filter rule must be rolled out as a canary unless it is saved with `force: true`.
 - Responses are capped at 120 KB. Narrow the query if a response says it was truncated.
 
 ### Troubleshooting

@@ -40,8 +40,8 @@ pip install cryptography
 curl -fsSLO https://raw.githubusercontent.com/CollectorCtrl/CollectorCtrl/main/scripts/verify-release.py
 
 # Download the file and its .sig into the same folder, then:
-python3 verify-release.py collectorctrl-supervisor_0.6.3-beta_linux_amd64.tar.gz
-# OK    collectorctrl-supervisor_0.6.3-beta_linux_amd64.tar.gz  (sha256 e1ab9efa…)
+python3 verify-release.py collectorctrl-supervisor_0.8.0-beta_linux_amd64.tar.gz
+# OK    collectorctrl-supervisor_0.8.0-beta_linux_amd64.tar.gz  (sha256 …)
 ```
 
 The script uses the current release key by default. For older releases pass the matching key: `--key <hex>`.
@@ -49,7 +49,7 @@ The script uses the current release key by default. For older releases pass the 
 ## Verify with OpenSSL 3
 
 ```bash
-F=collectorctrl-supervisor_0.6.3-beta_linux_amd64.tar.gz
+F=collectorctrl-supervisor_0.8.0-beta_linux_amd64.tar.gz
 KEY=cd8f932ebfd0e38a37e1235f4e7a61cb5dd6d8630b6f425b33fbbcf5880c5cde
 
 # 1. The file must match the signed digest
@@ -71,7 +71,21 @@ openssl pkeyutl -verify -pubin -inkey pub.pem -rawin -in msg.bin -sigfile sig.bi
 
 ## Packages inside CollectorCtrl
 
-When you upload a **supervisor** package under **Settings → Supervisor Lifecycle Management → Package Repository**, upload its `.sig` too. Supervisors install supervisor updates only with a valid release signature. For **collector** packages from other vendors, compare the SHA-256 shown in the **Sign** dialog with the checksum the vendor publishes before you approve it.
+When you upload a **supervisor** package under **Settings → Supervisors**, upload its `.sig` too. Supervisors install supervisor updates only with a valid release signature. For **collector** packages from other vendors (**Catalog → Packages**), compare the SHA-256 shown in the **Sign** dialog with the checksum the vendor publishes before you approve it.
+
+## Checks at install time
+
+A new host has no supervisor yet, so nothing on it knows the release keys. From **v0.8.0-beta** the server does the verifying, and the host trusts the server, whose CA it pins.
+
+- **Mirror sync.** The server is built with the same release keys as the supervisor. For every supervisor package it mirrors from GitHub it downloads the `.sig`, verifies it and only then keeps the package. A package without a valid signature is not mirrored.
+- **Serving.** `https://<server>:4321/packages/<package>.sig` is answered only when that file is a valid release signature of that package. This also holds for a mirror filled by hand or through an upload: copy or upload each package together with its `.sig`.
+- **Install commands.** The Linux, macOS and Windows one-line commands from **Add collector** download the package, then that `.sig`, and compare the SHA-256. A mismatch stops the installation before anything is installed. When the server has no signature for the package, the command prints a warning and installs; `--require-signature` (Linux, macOS) or `-RequireSignature` (Windows) turns that into an error.
+
+What this does not cover:
+
+- a package the host downloads directly from GitHub because the mirror does not have it;
+- the Package, Ansible and Installer snippets, the MSI and a hand-run `install.sh`. Verify those downloads yourself, as described above;
+- Authenticode: the Windows setup programs and the MSI are not Authenticode-signed.
 
 ## Software bill of materials (SBOM)
 
@@ -82,13 +96,15 @@ Each SBOM lists the Go standard library version and every Go module compiled int
 Load the SBOMs into Dependency-Track, Grype or Trivy to check for known vulnerabilities:
 
 ```bash
-grype sbom:collectorctrl-server_0.6.3-beta_linux_amd64.tar.gz.spdx.json
-trivy sbom collectorctrl-server_0.6.3-beta_linux_amd64.tar.gz.spdx.json
+grype sbom:collectorctrl-server_0.8.0-beta_linux_amd64.tar.gz.spdx.json
+trivy sbom collectorctrl-server_0.8.0-beta_linux_amd64.tar.gz.spdx.json
 ```
 
-In v0.6.3-beta, the Windows installers (the server `.exe` files and `collectorctrl-supervisor-setup_*.exe`) don't have their own SBOM, and server SBOMs list Go modules only. From the next release:
+Since **v0.6.4-beta**:
 
 - every Windows installer has an SBOM;
 - server SBOMs also list the web UI's npm packages, and the PostgreSQL installers list the bundled PostgreSQL;
 - each SBOM is signed like the other release files (`<file>.spdx.json.sig`);
-- the Docker images carry an SBOM and a cosign signature.
+- the server and supervisor container images are signed with Sigstore cosign (keyless) and carry an SPDX SBOM and SLSA build provenance.
+
+In v0.6.3-beta, the Windows installers didn't have their own SBOM, and server SBOMs listed Go modules only.

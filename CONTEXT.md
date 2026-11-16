@@ -1,8 +1,10 @@
 # CONTEXT: CollectorCtrl (public product repository)
 
-Working context for teammates and AI assistants, as of **v0.8.0-beta** (12 November 2026). This repo contains
+Working context for teammates and AI assistants, as of **v0.8.3-beta** (16 November 2026). This repo contains
 **no product source code**. The v0.8.0-beta documentation update was checked against the private product source and
-the published release assets; older statements are *as documented*. Unconfirmed points are under
+the published release assets. The v0.8.3-beta update was made without source access: it follows the published
+release notes, the release assets, and the web console and OpenAPI file shipped inside the signed server archive.
+Older statements are *as documented*. Unconfirmed points are under
 [Open questions](#10-open-questions).
 
 ---
@@ -35,7 +37,7 @@ Of this repo:
 | Item | Detail |
 | --- | --- |
 | Content | Markdown + Mermaid diagrams |
-| API spec | OpenAPI `3.0.3`, `info.version` `1.4.0`, 214 paths, "generated from the server's enforced route catalog" |
+| API spec | OpenAPI `3.0.3`, `info.version` `1.4.0`, 222 paths (v0.8.3-beta), "generated from the server's enforced route catalog" |
 | Script | `scripts/verify-release.py`: Python 3.8+, `cryptography` package (Ed25519) |
 | Examples | Docker Compose with `postgres:15-alpine` |
 | CI | None. `.github/workflows/docker-publish.yml` and `docker-server-image.yml` were deleted on 2026-09-01 |
@@ -120,14 +122,14 @@ The control plane never sits in the telemetry data path.
 | Path | What it is |
 | --- | --- |
 | `README.md` | Product overview, quick start, platforms, feature maturity, docs index |
-| `RELEASE_NOTES.md` | Notes for the current release (v0.8.0-beta) only |
-| `CHANGELOG.md` | One-line summary per release, 0.1.0-alpha → 0.8.0-beta; ⚠️ marks breaking changes and upgrade actions |
+| `RELEASE_NOTES.md` | Notes for the current release (v0.8.3-beta) only |
+| `CHANGELOG.md` | One-line summary per release, 0.1.0-alpha → 0.8.3-beta; ⚠️ marks breaking changes and upgrade actions |
 | `docs/setup.md` | Server install: Docker, Compose, Windows, Linux, macOS, Kubernetes notes, first sign-in, troubleshooting |
 | `docs/agent-onboarding.md` | Add collector command, installer options, existing collectors, MSI, labels, unprivileged mode, `supervisor.yaml` reference, sidecar, discovery |
 | `docs/enterprise-deployment.md` | Hosts that already run a collector, machine images, air-gapped sites (summary; full guides on collectorctrl.com/docs) |
 | `docs/configuration.md` | Server env-var reference, TLS modes, data dir, dev-only switches |
 | `docs/upgrading.md` | Upgrade order, changes to check 0.5.x to 0.8.x, backup/restore commands |
-| `docs/features.md` | Full capability list as of v0.8.0-beta |
+| `docs/features.md` | Full capability list as of v0.8.3-beta |
 | `docs/ai-copilot-and-mcp.md` | Approval model, providers, MCP endpoint, tool list, runbook prompts |
 | `docs/gitops.md` | GitHub/GHE sync, repo layout, `TelemetryPolicy` file format, webhook, API |
 | `docs/architecture.md` | Components, config flow, identity, ports |
@@ -201,8 +203,10 @@ There is no lint, link check or test suite. Release assets and the image are pro
 | Legacy mode | Shared-secret agent auth kept only as a migration window |
 | Data directory | Per-install CA, keys, secrets; losing it forces re-enrollment |
 
-UI vocabulary (v0.8.0-beta): the side menu is Overview, Fleet, Rollouts, Catalog (Templates, Packages, Custom builds),
-Governance (Sources, Insights, Destinations, Configuration), Instrumentation, Settings, Docs & API. Settings items:
+UI vocabulary (v0.8.3-beta, read from the console shipped in the server archive): the side menu is Overview, Fleet
+(List, Map, Topology; All / Hosts / Kubernetes), Rollouts, Catalog (Templates, Packages, Custom builds),
+Governance (Sources, Insights, Destinations, Configuration), Instrumentation (Overview, Applications, Agents;
+Everywhere / Hosts / Kubernetes), Settings, Docs & API. "Fleet inventory" was merged into Fleet in v0.8.3-beta. Settings items:
 Users, Roles & permissions, Single sign-on, Tokens, Classification rules, Supervisors, Git, Alert channels,
 Email (SMTP), Model & provider, Pending approvals, Database, License, Audit log, API reference. Leave historical
 changelog rows as they were written.
@@ -213,7 +217,7 @@ Terminology note: the product UI and docs still use "agent" in fixed labels (per
 ## 7. Conventions
 
 - **Docs style** (as practised in recent PRs): plain, short sentences; tables over prose; bold for UI labels; UI paths as **Settings → X**, **Governance → Configuration**; `<version>` / `<arch>` placeholders; `example.com` hosts; `cc_your_token`-style placeholders.
-- **Every version-specific statement names its version** ("since v0.5.3-beta", "v0.8.0-beta (12 November 2026)"). README banner, `features.md`, `SECURITY.md`, `RELEASE_NOTES.md` and `CHANGELOG.md` must move together on each release.
+- **Every version-specific statement names its version** ("since v0.5.3-beta", "v0.8.3-beta (16 November 2026)"). README banner, `features.md`, `SECURITY.md`, `RELEASE_NOTES.md` and `CHANGELOG.md` must move together on each release.
 - **Breaking changes**: ⚠️ in CHANGELOG plus a section in `docs/upgrading.md` ("Changes to check in 0.X.x").
 - **Feature maturity labels**: Beta / Alpha / Pilot / Not yet available (README table). Mark non-beta features in headings, e.g. *(alpha)*, *(pilot)*.
 - **Security posture in docs**: secure defaults first; every weakening switch is labelled "development only" or "testing only".
@@ -233,8 +237,9 @@ Terminology note: the product UI and docs still use "agent" in fixed labels (per
 | Pilot | Kubernetes workload observation (read-only) |
 | Not yet available | Multi-replica HA; managing Kubernetes workload config |
 
-Documented gaps: `collectorctrl-mcp` adapter not in release downloads (none in the v0.8.0-beta assets); the
-v0.8.0-beta release page has no supervisor `.deb` / `.rpm` although the release notes describe them; the Ansible
+Documented gaps: `collectorctrl-mcp` adapter not in release downloads (none in the v0.8.3-beta assets); the
+v0.8.0-beta and v0.8.3-beta release pages have no supervisor `.deb` / `.rpm` although the v0.8.0-beta notes describe them;
+no versioned container image tags in GHCR (only `latest`, `main`, `main-<commit>`, checked 16 November 2026); the Ansible
 role and Packer / cloud-init / Terraform examples are not in this repository; Windows setup programs and MSI not
 Authenticode-signed; macOS collector takeover not run on a Mac; signature check only in the one-line install
 commands; unprivileged mode is Linux/systemd only; supervisor upgrade queue kept in memory; Governance not
@@ -244,9 +249,10 @@ TODO/FIXME: none in this repo.
 
 ### Recent direction (git log)
 
+- Nov 2026: docs brought up to v0.8.3-beta (topology summary, merged Fleet list, safer instrumentation); `docs/api/openapi.json` replaced with the file shipped in the v0.8.3-beta server archive (222 paths).
 - Nov 2026: docs brought up to v0.8.0-beta (0.6.4, 0.7.x and 0.8.0 changes), `docs/enterprise-deployment.md` added.
 - Oct 2026: docs refreshed for v0.6.3-beta, licensing clarified, SBOM section added (PRs #1–#3).
-- Releases accelerated from v0.5.1 (28 Sep) to v0.8.0 (12 Nov): security-by-default (0.5.x), Kubernetes visibility (0.6.x), hardening and scale (0.7.x), enterprise installation and Governance (0.8.x).
+- Releases accelerated from v0.5.1 (28 Sep) to v0.8.3 (16 Nov): security-by-default (0.5.x), Kubernetes visibility (0.6.x), hardening and scale (0.7.x), enterprise installation and Governance (0.8.x).
 - Mid-2026: Telemetry Governor deploy files, Helm values and a K8s code folder were added and later removed from this repo.
 
 ### Claims to check against the product
@@ -264,10 +270,11 @@ These are statements users will rely on; confirm each in the server source befor
 - [ ] Notification grouping above 5 per environment; 250 notifications kept per environment
 - [ ] Supervisor accepts only release-signed supervisor packages
 - [ ] OpAMP frame limit 16 MB
-- [x] macOS server and Supervisor (`.tar.gz`), Windows amd64 and arm64 installers and MSI exist in the v0.8.0-beta assets
+- [x] macOS server and Supervisor (`.tar.gz`), Windows amd64 and arm64 installers and MSI exist in the v0.8.0-beta and v0.8.3-beta assets
 - [ ] Windows server install directory (`C:\Program Files\CollectorCtrl`): the setup program's own installation of the Supervisor is documented in the product source as `C:\Program Files (x86)\CollectorCtrl Supervisor`
-- [ ] `docs/api/openapi.json` matches the server's `/api/docs/openapi.json` for v0.8.0-beta (not regenerated in the v0.8.0-beta docs update)
-- [ ] Versioned image tags per release (stated in `setup.md`, from the v0.6.4-beta notes)
+- [x] `docs/api/openapi.json` is the file shipped in `collectorctrl-server_0.8.3-beta_linux_amd64.tar.gz` (`frontend/dist/api/docs/openapi.json`, signature verified). Not compared with a running server's `/api/docs/openapi.json`
+- [ ] v0.8.3-beta: "macOS support is labelled experimental" (release notes). The string is not in the shipped console bundle; confirm what it covers before changing the platform table
+- [ ] Versioned image tags per release: described in the v0.6.4-beta notes, but GHCR lists none (16 November 2026); `setup.md` now says so
 
 ## 9. Gotchas
 
@@ -283,7 +290,7 @@ These are statements users will rely on; confirm each in the server source befor
 - **Environment names** became case-insensitive in 0.6.3; unclassified is `unknown`, but Governor S3 paths still use `environment=default`.
 - **Policy/canary/GitOps MCP proposals** need an unscoped token.
 - **Backups exclude env-supplied secrets** and the PostgreSQL database (take `pg_dump` too).
-- **Image versioning**: README quick start uses `:latest`; releases publish versioned tags since v0.6.4-beta.
+- **Image versioning**: README quick start uses `:latest`; GHCR lists only `latest`, `main` and `main-<commit>` tags (16 November 2026), although the v0.6.4-beta notes describe versioned tags.
 - **Release notes vs. assets**: check `gh release view <tag> --json assets` before documenting a download. The v0.8.0-beta notes describe `.deb` / `.rpm` packages that are not on the release page.
 - **Docs mention `collectorctrl.com/docs`** as the canonical docs site; this repo and the site can drift.
 
@@ -294,9 +301,8 @@ These are statements users will rely on; confirm each in the server source befor
 3. Is the collectorctrl.com docs site generated from this `docs/` folder, or maintained separately?
 4. Should this repo get a link checker / Markdown lint workflow?
 5. When will `collectorctrl-mcp` ship in release downloads?
-6. Version alignment: server 0.8.0-beta vs K8s operator (readiness needs 0.8.0, rollout state 0.9, settings table 0.9.1). Is there a compatibility table?
+6. Version alignment: server 0.8.3-beta vs K8s operator (readiness needs 0.8.0, rollout state 0.9, settings table 0.9.1; which operator version carries the multi-container changes in the v0.8.3-beta notes?). Is there a compatibility table?
 10. Where do public users get the Ansible role and the Packer / cloud-init / Terraform examples, and will `.deb` / `.rpm` packages be attached to a release?
-11. `CLAUDE.md` points to `AGENTS.md`, which was deleted.
 7. GA target Jan–Feb 2027: which "Beta" features are expected to reach GA, and does Kubernetes observation leave "pilot"?
 8. `SECURITY.md` here and in the operator repo list different reporting channels. Intended?
 9. The PR template asks about coding standards and DB migrations, which don't apply to a docs-only repo. Keep or split?

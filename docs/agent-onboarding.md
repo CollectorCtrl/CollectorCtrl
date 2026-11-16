@@ -57,7 +57,7 @@ Useful script options:
 | `--ca-sha256` / `-f` | `-CaSha256` | Pin the server CA's SHA-256 fingerprint |
 | `--otelcol-binary` / `-b` | `-OtelBin` | Collector executable |
 | `--otelcol-config` / `-c` | `-OtelConfig` | Initial collector config file |
-| `--version` / `-v` | `-Version` | Supervisor version to install, e.g. `0.8.0-beta` (default: the newest release) |
+| `--version` / `-v` | `-Version` | Supervisor version to install, e.g. `0.8.3-beta` (default: the newest release) |
 | `--environment` (Linux only) | `-Environment` | Environment reported as the `deployment.environment` label |
 | `--require-signature` | `-RequireSignature` | Stop when the server has no release signature for the package |
 | `--insecure-skip-verify` | `-InsecureSkipVerify` | Skip certificate verification. **Testing only.** |
@@ -160,7 +160,7 @@ msiexec /i collectorctrl-supervisor_<version>_windows_amd64.msi /qn /l*v supervi
 - Group Policy software installation cannot pass properties on a command line; put them in a transform (`.mst`).
 - The MSI is not Authenticode-signed.
 
-**`.deb` and `.rpm`.** The v0.8.0-beta release notes describe supervisor `.deb` and `.rpm` packages, but the [v0.8.0-beta release page](https://github.com/CollectorCtrl/CollectorCtrl/releases/tag/v0.8.0-beta) does not list any. Use the `.tar.gz` and `install.sh` on Linux.
+**`.deb` and `.rpm`.** The v0.8.0-beta release notes describe supervisor `.deb` and `.rpm` packages, but neither that release page nor the [v0.8.3-beta release page](https://github.com/CollectorCtrl/CollectorCtrl/releases/tag/v0.8.3-beta) lists any. Use the `.tar.gz` and `install.sh` on Linux.
 
 **Ansible, Packer, cloud-init and Terraform.** v0.8.0-beta adds an Ansible role (`collectorctrl_supervisor`) and Packer, cloud-init and Terraform examples. They are not in this repository; see [collectorctrl.com/docs](https://collectorctrl.com/docs).
 
@@ -283,7 +283,7 @@ Discovery is **off by default**. When enabled, the Supervisor periodically lists
 - For automated deployments you can also set `discovery.enabled: true` in `supervisor.yaml`.
 - Command-line arguments that look like secrets are redacted before reports are sent.
 
-Instrumentation (ZeroTouch) is **alpha**. See [Features](features.md#instrumentation-alpha).
+Instrumentation (ZeroTouch) is **alpha**. Since v0.8.3-beta, instrumentation actions follow environment limits, and crash protection removes the agent from a Linux service that fails to start after being instrumented. See [Features](features.md#instrumentation-alpha).
 
 ## Removing or re-adding a host
 

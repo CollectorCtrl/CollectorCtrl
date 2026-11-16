@@ -18,7 +18,7 @@ Deploy, configure, govern and upgrade your entire OpenTelemetry Collector fleet 
 
 ---
 
-> **Public beta.** The current release is **v0.8.0-beta** (12 November 2026). CollectorCtrl is free to use and self-hosted. Betas can include breaking changes: read the [release notes](RELEASE_NOTES.md) before upgrading, and see [what's stable](#feature-maturity) before planning production use.
+> **Public beta.** The current release is **v0.8.3-beta** (16 November 2026). CollectorCtrl is free to use and self-hosted. Betas can include breaking changes: read the [release notes](RELEASE_NOTES.md) before upgrading, and see [what's stable](#feature-maturity) before planning production use.
 
 ## Why CollectorCtrl
 
@@ -32,8 +32,8 @@ OpenTelemetry made the data plane vendor-neutral. The fleet that runs it usually
 
 | | |
 | :--- | :--- |
-| **Fleet management over OpAMP** | Live inventory of every collector on Windows, Linux, macOS and containers: health, version, effective config, attributes. List, map and topology views, classified by environment and role. |
-| **Kubernetes workloads** *(pilot)* | See the collector Deployments, DaemonSets and StatefulSets you deploy with Helm or GitOps next to host collectors, read-only, via the [Kubernetes observer](https://github.com/CollectorCtrl/CollectorCtrl-K8s-Operator). |
+| **Fleet management over OpAMP** | Live inventory of every collector on Windows, Linux, macOS and containers: health, version, effective config, attributes. Hosts and Kubernetes collectors in one list, a map, and a topology view that shows the path from applications through collectors to each destination. Classified by environment and role. |
+| **Kubernetes workloads** *(pilot)* | See the collector Deployments, DaemonSets and StatefulSets you deploy with Helm or GitOps in the same Fleet list as host collectors, read-only, via the [Kubernetes observer](https://github.com/CollectorCtrl/CollectorCtrl-K8s-Operator). |
 | **Policy-driven configuration** | Label-selector policies, SHA-256-versioned configs, canary rollouts with promote and abort, one-click rollback, full configuration history with diffs. |
 | **Drift prevention** | Each agent reports its effective config hash. Drift is flagged or reverted automatically, per policy. |
 | **Self-healing collectors** | Every new config is validated by the collector before it's applied. A config that crash-loops the collector is rolled back to the last known good one. |
@@ -43,7 +43,7 @@ OpenTelemetry made the data plane vendor-neutral. The fleet that runs it usually
 | **Sidecar pipelines** | Run a second, isolated collector beside the main one, for example to keep a SIEM pipeline running while you change the observability pipeline. |
 | **Supervisor and collector lifecycle** | Signed package repository, fleet-wide collector upgrades with watchdogs and automatic rollback, supervisor upgrades that start with a canary cohort, and an integrated Custom Builder (`ocb`). |
 | **Installation for existing estates** | Supervisor installers take over a collector that already runs as its own service. An MSI for SCCM, Intune and Group Policy, and installer options for enrollment, the server CA, labels, machine images and air-gapped sites. See [Enterprise deployment scenarios](docs/enterprise-deployment.md). |
-| **Instrumentation** *(alpha)* | Discover applications on managed hosts and attach OpenTelemetry agents (Java, .NET, Node.js, Python) from the UI, with canary rollout and centrally managed agent versions. For Kubernetes, see which APM agent each workload runs and what stands between it and OpenTelemetry. |
+| **Instrumentation** *(alpha)* | Discover applications on managed hosts and attach OpenTelemetry agents (Java, .NET, Node.js, Python) from the UI, with canary rollout, centrally managed agent versions and crash protection that removes an agent from a Linux service that no longer starts. For Kubernetes, see which APM agent each workload runs and what stands between it and OpenTelemetry. |
 | **Governance** | Edge taps sample telemetry at the collector at one global rate (default 10%), Insights ranks the recurring patterns behind your volume, and the optimizer turns them into validated filter or sampling rules rolled out by policy. Fan out to S3 or OTLP destinations. |
 | **Enterprise security** | Per-agent enrollment and credentials, TLS by default with a per-install CA, OIDC SSO, granular RBAC with environment-scoped tokens, tamper-evident audit trail streamed to your SIEM over OTLP. |
 | **Alerting by environment** | Notifications filtered per environment, and alert channels (email, Slack, Microsoft Teams, PagerDuty, webhooks) routed by environment, with one summary alert instead of hundreds during an outage. |
@@ -119,7 +119,7 @@ More detail: [docs/architecture.md](docs/architecture.md).
 | Docker | ✅ | — | `ghcr.io/collectorctrl/collectorctrl-server` |
 | Kubernetes | Single replica | Observation pilot via the [K8s observer](https://github.com/CollectorCtrl/CollectorCtrl-K8s-Operator) | See [setup notes](docs/setup.md#kubernetes) |
 
-Every release file has a detached `.sig` signature and an SPDX SBOM (`.spdx.json`). The v0.8.0-beta release notes describe supervisor `.deb` and `.rpm` packages; the [v0.8.0-beta release page](https://github.com/CollectorCtrl/CollectorCtrl/releases/tag/v0.8.0-beta) does not list any, so use the `.tar.gz` on Linux. See [Verifying downloads](docs/verifying-downloads.md).
+Every release file has a detached `.sig` signature and an SPDX SBOM (`.spdx.json`). The v0.8.0-beta release notes describe supervisor `.deb` and `.rpm` packages; neither that release page nor the [v0.8.3-beta release page](https://github.com/CollectorCtrl/CollectorCtrl/releases/tag/v0.8.3-beta) lists any, so use the `.tar.gz` on Linux. See [Verifying downloads](docs/verifying-downloads.md).
 
 ## Feature maturity
 

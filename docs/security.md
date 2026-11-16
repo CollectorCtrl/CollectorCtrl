@@ -103,6 +103,10 @@ CollectorCtrl controls what runs on every host in your fleet, so a default insta
 - Only `OTEL_*` variables are accepted from callers. Loader variables (`JAVA_TOOL_OPTIONS`, `NODE_OPTIONS`, …) are always generated on the node.
 - Services are never restarted without consent ("restart required" by default). Standalone apps are relaunched as the same user, and processes under the Windows system directory are refused.
 - Agent assets are checksum-pinned and downloaded only over HTTPS from allowed hosts.
+- Since v0.8.3-beta, environment limits apply to instrumentation: a user or API token limited to one environment cannot instrument, remove, deliver agents, pin versions or reconcile on hosts in another, in the console or through MCP. Fleet-wide instrumentation settings need access to all environments.
+- Since v0.8.3-beta, on Windows the Supervisor's storage folder is limited to SYSTEM and Administrators, and the agent folder is read-only for other users.
+- Since v0.8.3-beta, details of a conflict with an existing variable carry only the variable's name, never its value.
+- Crash protection (v0.8.3-beta): if a Linux service fails to start after being instrumented, the agent is removed at the next scan without restarting the service. It does not yet cover a Windows service that fails at startup, or a standalone process that dies within seconds of a restart.
 
 ## Hardening checklist
 

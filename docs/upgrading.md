@@ -101,7 +101,7 @@ The full list is in each release's notes on the [Releases](https://github.com/Co
 - **Instrumentation (0.7.0).** Instrumenting a standalone process no longer restarts it unless explicitly confirmed (`confirm_restart: true` in the API).
 - **Governor drop rules (0.7.0).** A policy that adds or changes an optimizer drop, sample or trace filter rule must go through a canary rollout or be saved with `force: true`.
 - **Environment-scoped tokens (0.7.0).** A scoped token is refused on every action outside its environment, not only on reads.
-- **Kubernetes operator (0.7.1).** Auto-instrumentation rollout state needs operator 0.9, and the OpenTelemetry settings table needs operator 0.9.1. Instrumentation readiness moved from the Fleet page to ZeroTouch Instrumentation → Kubernetes (**Instrumentation → Kubernetes** from 0.8.0).
+- **Kubernetes operator (0.7.1).** Auto-instrumentation rollout state needs operator 0.9, and the OpenTelemetry settings table needs operator 0.9.1. Instrumentation readiness moved from the Fleet page to ZeroTouch Instrumentation → Kubernetes (under **Instrumentation** from 0.8.0).
 - **Custom builds (0.7.3).** Builds need Go 1.25 or newer on the server, or the `server-ocb` image target, and access to the Go module proxy or a `GOPROXY` mirror. On a Windows service, set `GOMODCACHE` and `COLLECTORCTRL_OCB_CACHE_DIR` to move the caches out of the service account's profile.
 - **Package order (0.7.3).** `/api/packages` returns newest first.
 
@@ -120,6 +120,10 @@ The full list is in each release's notes on the [Releases](https://github.com/Co
 - **Linux server with PostgreSQL (0.8.0).** A database from an earlier install is transferred to the new `collectorctrl` role. A connection you configured yourself is kept.
 - **MSI and setup program do not mix (0.8.0).** The MSI refuses to install while the setup program's installation is present. Moving from one to the other keeps the identity but not `supervisor.yaml`.
 - **Web console (0.8.0).** The Telemetry section is now **Governance**, with **Instrumentation** as a separate section; old links (`?view=telemetry`, `data_wizard`, `zerotouch`) open the matching section. Links that used `view=patterns` inside Insights now use `panel=patterns`. Get Started is now **Add collector**, and Copilot and MCP proposals are approved under **Rollouts → Approvals**. In the Notification Center, clicking a notification opens its detail and marks it read.
+- **Instrumentation and environment limits (0.8.3).** A user or token limited to one environment can no longer instrument, remove, deliver agents, pin versions or reconcile on hosts in another environment, in the console or through MCP. Fleet-wide instrumentation settings need access to all environments. Review roles and tokens that relied on the old behaviour.
+- **Fleet inventory (0.8.3).** "Fleet inventory" is merged into **Fleet**. Kubernetes collectors are in the same list; use the Hosts / Kubernetes switch and the cluster and namespace filters.
+- **Instrumentation status (0.8.3).** A rejected agent delivery now shows as failed instead of "Restart needed". If a Linux service fails to start after being instrumented, crash protection removes the agent at the next scan and does not restart the service.
+- **Kubernetes operator (0.8.3).** Instrumenting every Java container in a pod, the comma-separated container annotation and immediate readiness updates are operator changes: upgrade the [operator](https://github.com/CollectorCtrl/CollectorCtrl-K8s-Operator) to get them.
 
 ## Backup and restore
 

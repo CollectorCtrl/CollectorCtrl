@@ -110,6 +110,8 @@ Run `tools/list` against your server for the authoritative list, with input sche
 
 `governor_set_sampling` was removed in v0.8.0-beta: the sampling rate is one global setting under **Governance → Configuration**, and there is no MCP tool for it. A proposal for the old tool created before the upgrade fails when approved.
 
+Since v0.8.3-beta the instrumentation tools follow the token's environment limit: a token limited to one environment cannot instrument, remove, deliver agents, pin versions or reconcile on hosts in another, and fleet-wide instrumentation settings need access to all environments.
+
 ### Runbook prompts
 
 | Prompt | Purpose |

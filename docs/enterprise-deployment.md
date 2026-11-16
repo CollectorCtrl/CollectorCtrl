@@ -1,6 +1,6 @@
 # Enterprise deployment scenarios
 
-Three situations that come up when CollectorCtrl is rolled out across an existing estate, as of **v0.8.0-beta**. This page is a summary. The full guides are at [collectorctrl.com/docs](https://collectorctrl.com/docs).
+Three situations that come up when CollectorCtrl is rolled out across an existing estate, as of **v0.8.3-beta**. This page is a summary. The full guides are at [collectorctrl.com/docs](https://collectorctrl.com/docs).
 
 - [Hosts that already run a collector](#hosts-that-already-run-a-collector)
 - [Machine images](#machine-images)

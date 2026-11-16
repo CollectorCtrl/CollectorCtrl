@@ -6,6 +6,8 @@
 - [Upgrading from 0.5.0 or earlier](#upgrading-from-050-or-earlier)
 - [Changes to check in 0.5.2 – 0.5.5](#changes-to-check-in-052--055)
 - [Changes to check in 0.6.x](#changes-to-check-in-06x)
+- [Changes to check in 0.7.x](#changes-to-check-in-07x)
+- [Changes to check in 0.8.x](#changes-to-check-in-08x)
 - [Backup and restore](#backup-and-restore)
 
 CollectorCtrl is in public beta, and betas can contain breaking changes. Read the [release notes](../RELEASE_NOTES.md) for every version you skip.
@@ -26,16 +28,16 @@ Database migrations run automatically at start-up.
 | :--- | :--- |
 | **Docker** | `docker pull ghcr.io/collectorctrl/collectorctrl-server:latest`, then recreate the container with the **same** `/var/lib/collectorctrl` volume. |
 | **Compose** | `docker compose pull && docker compose up -d` |
-| **Windows** | Run the new installer over the existing installation. It keeps the data directory and the service's `Environment` registry value. |
-| **Linux** | `sudo systemctl stop collectorctrl`, extract the new archive, run `sudo ./install.sh`. The service restarts on the new version. |
+| **Windows** | Run the new installer over the existing installation. It keeps the data directory, the accounts and the service's `Environment` registry value. The PostgreSQL edition offers "Keep the current database configuration". |
+| **Linux** | `sudo systemctl stop collectorctrl`, extract the new archive, run `sudo ./install.sh`. The service restarts on the new version and the existing accounts are kept. |
 
 ## Upgrading supervisors and collectors
 
-- **Supervisors:** upload the new supervisor package together with its `.sig` under **Settings → Supervisor Lifecycle Management → Package Repository**, then roll it out from the UI. Upgrades are throttled and queued, a bulk upgrade halts if too many fail, and a supervisor that can't reconnect after upgrading rolls itself back. Supervisors accept **only release-signed** supervisor packages.
-- **Collectors and sidecars:** upload the package on **Packages**, click **Sign** (after checking the SHA-256 against the vendor's published checksum), and roll it out through a policy or per collector. A collector you stopped on purpose stays stopped after an upgrade.
-- **Re-running the Get Started command** on a host also upgrades its supervisor in place.
+- **Supervisors:** upload the new supervisor package together with its `.sig` under **Settings → Supervisors**, then roll it out from there. Since v0.8.0-beta an upgrade of two or more supervisors starts with a canary cohort (10%, at least one, one per operating system); the rest wait until every canary reports the new version and has stayed connected for 2 minutes, and a canary that fails halts the queue with no other supervisor touched. The queue advances on the server without the page being open, but it is kept in memory: after a server restart during a rollout, start the upgrade again. A supervisor that can't reconnect after upgrading rolls itself back. Supervisors accept **only release-signed** supervisor packages.
+- **Collectors and sidecars:** upload the package under **Catalog → Packages**, click **Sign** (after checking the SHA-256 against the vendor's published checksum), and roll it out through a policy or per collector. A collector you stopped on purpose stays stopped after an upgrade.
+- **Re-running the Add collector command** on a host also upgrades its supervisor in place.
 
-> **Supervisors from 0.5.2 or earlier:** release signing keys changed in 0.5.2 and again in 0.5.3, so those supervisors can't verify newer supervisor packages. Upgrade them **once by hand** by re-running the Get Started command on each host. Remote supervisor upgrades work again from there on. Collector package upgrades are not affected.
+> **Supervisors from 0.5.2 or earlier:** release signing keys changed in 0.5.2 and again in 0.5.3, so those supervisors can't verify newer supervisor packages. Upgrade them **once by hand** by re-running the Add collector command (called Get Started before v0.8.0-beta) on each host. Remote supervisor upgrades work again from there on. Collector package upgrades are not affected.
 
 ## Upgrading from 0.5.0 or earlier
 
@@ -47,7 +49,7 @@ v0.5.1 made a default install secure and contains **breaking changes**. For an e
 4. **Upgrade every supervisor by hand once** by re-running the Get Started command (with a new enrollment token). Upgraded supervisors that connect in legacy mode are migrated to their own per-agent credential automatically.
 5. Watch the banner in the UI (“N of M agents have their own credential”). When every agent is enrolled, remove `OPAMP_LEGACY_MODE` and restart the server.
 6. **Re-save** the OIDC, SMTP, S3, AI, Git and license settings once, so they're re-encrypted with the new key.
-7. **Sign** previously uploaded collector packages on the **Packages** page. Unsigned packages are no longer installed.
+7. **Sign** previously uploaded collector packages under **Catalog → Packages**. Unsigned packages are no longer installed.
 
 What changed:
 
@@ -86,6 +88,38 @@ The full list is in each release's notes on the [Releases](https://github.com/Co
 - **Alerts (0.6.3).** Disconnect and config-rejection alerts may arrive a few seconds later and, above 5 in an environment, are grouped into one summary. Alert rules that match the exact title "Collector Disconnected: …" or "Config Rejection: …" won't match a summary.
 - **Environments (0.6.3).** Environment names are no longer case-sensitive: a token limited to `prod` also sees collectors classified as `Prod`. Review scoped tokens if you used capitalization to separate environments. Unclassified hosts and applications report `unknown` instead of `default`; Telemetry Governor S3 archive paths still use `environment=default`.
 - **Older notifications (0.6.3)** have no environment and show as Fleet-wide.
+
+## Changes to check in 0.7.x
+
+- **Browser sessions (0.7.0).** Sessions move from page storage to an HttpOnly cookie, so every user signs in again once. An integration that read the session token from the browser must switch to an API token.
+- **Reverse proxies (0.7.0).** If a proxy terminates TLS, set `COLLECTORCTRL_TRUST_PROXY_HEADERS=true` so the cookie's `Secure` flag and sign-in throttling see the real scheme and client address. If the UI is served from a different origin, set `COLLECTORCTRL_ALLOWED_ORIGIN`; CORS grants nothing unless it is set.
+- **Content-Security-Policy (0.7.0).** Installations that embed CollectorCtrl in a frame or load it alongside other scripts should test with `COLLECTORCTRL_CSP=report-only` first.
+- **Administrator password in production mode (0.7.0).** A new production-mode install no longer starts with `admin` / `admin`. Set `COLLECTORCTRL_ADMIN_PASSWORD`, or read the one-time password from the server log on first start.
+- **Database migrations (0.7.0).** The first start records the migration baseline. Back up before upgrading. `collectorctrl-server -migrate-status` lists applied and pending versions.
+- **Collector health check address (0.7.0).** The `health_check` extension the Supervisor adds listens on `127.0.0.1:13133` instead of `0.0.0.0:13133`. External monitors that polled it need `distro.health_check.endpoint` set in `supervisor.yaml`.
+- **MCP settings (0.7.0).** Editors lose access to MCP governance settings; an admin must change them. Four-eyes approval stays as configured on existing installs and defaults to on for new ones.
+- **Instrumentation (0.7.0).** Instrumenting a standalone process no longer restarts it unless explicitly confirmed (`confirm_restart: true` in the API).
+- **Governor drop rules (0.7.0).** A policy that adds or changes an optimizer drop, sample or trace filter rule must go through a canary rollout or be saved with `force: true`.
+- **Environment-scoped tokens (0.7.0).** A scoped token is refused on every action outside its environment, not only on reads.
+- **Kubernetes operator (0.7.1).** Auto-instrumentation rollout state needs operator 0.9, and the OpenTelemetry settings table needs operator 0.9.1. Instrumentation readiness moved from the Fleet page to ZeroTouch Instrumentation → Kubernetes (**Instrumentation → Kubernetes** from 0.8.0).
+- **Custom builds (0.7.3).** Builds need Go 1.25 or newer on the server, or the `server-ocb` image target, and access to the Go module proxy or a `GOPROXY` mirror. On a Windows service, set `GOMODCACHE` and `COLLECTORCTRL_OCB_CACHE_DIR` to move the caches out of the service account's profile.
+- **Package order (0.7.3).** `/api/packages` returns newest first.
+
+## Changes to check in 0.8.x
+
+- **Unattended supervisor installs take over an existing collector (0.8.0).** `--non-interactive`, the Add collector commands and the Ansible role stop and disable a collector service that runs the same binary, without asking. Pass `--keep-existing-collector` / `/EXISTING_COLLECTOR=keep` to prevent it. After a takeover the collector runs as the Supervisor's user (root or LocalSystem by default). See [Enterprise deployment scenarios](enterprise-deployment.md#hosts-that-already-run-a-collector).
+- **Supervisor upgrades take longer (0.8.0).** A rollout to two or more supervisors waits at least two minutes for the canary stage and stops if a canary fails. `skip_canary` on `POST /api/governor/supervisors/upgrade` upgrades every supervisor at once.
+- **The mirror refuses unsigned packages (0.8.0).** The server no longer mirrors a supervisor package whose release signature is missing or invalid. On an air-gapped server, copy each package's `.sig` next to it, or the install commands print a warning (and stop with `--require-signature`).
+- **Per-collector sampling rates are gone (0.8.0).** Every tapped collector moves to the global rate (10% unless you change it under **Governance → Configuration**) the next time its configuration is generated. If you ran collectors at different rates, Insights counts change at the upgrade.
+- **External sources keep their old rate until you update them (0.8.0).** Copy the configuration from the source's Details into its collector again. Until then the source shows as "Not reported" or with its own rate.
+- **MCP (0.8.0).** The `governor_set_sampling` tool is removed. A proposal for it created before the upgrade fails when approved.
+- **Governor API (0.8.0).** `sampling_rate` on `POST /api/governor/taps/toggle` and `POST /api/templates/tap`, and the `sampling` parameter of `GET /api/governor/source-config`, are ignored. The global rate is `sampling_percentage` on `GET` / `POST /api/governor/tap-config`.
+- **Labels become attributes (0.8.0).** A `supervisor.yaml` that already has a `labels:` section reports those labels as collector attributes after the supervisor is upgraded. An attribute the supervisor or the collector already reports keeps its value.
+- **Collectors installed from Add collector report an environment (0.8.0).** The Linux and Windows commands pass the environment chosen on the page as the `deployment.environment` label. Classification rules still take precedence.
+- **Host names may change (0.8.0).** Linux and macOS hosts that reported the placeholder `linux-node-01` or `macos-node-01` now report their real host name.
+- **Linux server with PostgreSQL (0.8.0).** A database from an earlier install is transferred to the new `collectorctrl` role. A connection you configured yourself is kept.
+- **MSI and setup program do not mix (0.8.0).** The MSI refuses to install while the setup program's installation is present. Moving from one to the other keeps the identity but not `supervisor.yaml`.
+- **Web console (0.8.0).** The Telemetry section is now **Governance**, with **Instrumentation** as a separate section; old links (`?view=telemetry`, `data_wizard`, `zerotouch`) open the matching section. Links that used `view=patterns` inside Insights now use `panel=patterns`. Get Started is now **Add collector**, and Copilot and MCP proposals are approved under **Rollouts → Approvals**. In the Notification Center, clicking a notification opens its detail and marks it read.
 
 ## Backup and restore
 

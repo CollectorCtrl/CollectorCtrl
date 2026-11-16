@@ -7,12 +7,12 @@ CollectorCtrl can keep fleet policies and per-collector overrides in a GitHub
 source of change; CollectorCtrl syncs it and applies valid changes to the
 fleet.
 
-Settings > **Git Integration** is where you connect the repository, see sync
+**Settings → Git** is where you connect the repository, see sync
 status and drift, and propose changes.
 
 ## How it works
 
-1. **Connect** a repository with an access token (Settings > Git Integration >
+1. **Connect** a repository with an access token (Settings → Git →
    Add repository). Only one repository can sync at a time.
 2. **Export** writes the current fleet policies and collector overrides into
    the repository as one commit.

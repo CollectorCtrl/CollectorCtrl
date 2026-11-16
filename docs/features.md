@@ -1,6 +1,6 @@
 # Features
 
-What CollectorCtrl does as of **v0.8.0-beta**. Everything is **beta** unless marked otherwise.
+What CollectorCtrl does as of **v0.8.3-beta**. Everything is **beta** unless marked otherwise.
 
 The side menu of the web console is **Overview**, **Fleet**, **Rollouts**, **Catalog**, **Governance**, **Instrumentation**, **Settings** and **Docs & API**. Governance is the section formerly called Telemetry; the engine behind it is the Telemetry Governor.
 
@@ -28,6 +28,8 @@ The side menu of the web console is **Overview**, **Fleet**, **Rollouts**, **Cat
 
 - **Live inventory** of every collector connected over OpAMP: health, status reason, version, OS and architecture, effective configuration, attributes and last heartbeat.
 - **Three views:** a **List** with one filter bar, an attention line that links to what needs a person, and fifty rows per page; a **Map**; and a **Topology** view of collectors, gateways and their connections. Paging and filtering run in the database, and a page shows at most 5,000 collectors.
+- **One list for hosts and Kubernetes** (since v0.8.3-beta): the former "Fleet inventory" is part of **Fleet**. Switch between **All**, **Hosts** and **Kubernetes**, and filter by cluster and namespace. The list's columns have a default set, a column picker and **Reset to default**.
+- **Topology summary** (since v0.8.3-beta): a summary at the top of the Topology view shows the path from applications, through collectors, to each destination as flow bands. Destinations are grouped by vendor and region, so one exporter that sends to two regions shows as two destinations. Collectors that forward to a gateway are linked to it by its address, and Kubernetes collectors and instrumented workloads appear too. A collector that sends data nowhere outside the host is flagged.
 - **Overview:** a first-run page with the server's address, **Add collector** and a setup checklist, and a summary page afterwards.
 - **Fleet Classification Rules:** ordered environment and role rules (agent, gateway, K8s sidecar) with operators such as equals, contains, starts/ends with and regex. A live preview shows exactly which collectors a rule matches, and what would be left without an environment, before you save. Environment names are case-insensitive everywhere, one spelling is kept per environment, and collectors without one show as **Unclassified**.
 - **Environment scoping:** the environment scope in the top bar applies on every page, and the Notification Center, search and Copilot follow it.
@@ -37,10 +39,11 @@ The side menu of the web console is **Overview**, **Fleet**, **Rollouts**, **Cat
 ## Kubernetes workloads (pilot)
 
 - **Observe existing collectors in Kubernetes** with the [Kubernetes observer](https://github.com/CollectorCtrl/CollectorCtrl-K8s-Operator): Deployments, DaemonSets and StatefulSets deployed by your own Helm charts or GitOps appear next to host collectors. You keep your existing charts, repositories and pipelines.
-- **One inventory:** switch between All, Host collectors and Kubernetes workloads, with cluster and namespace filters.
-- **Workload detail:** observed ConfigMap references, configuration hashes, optional configuration content (opt-in), pod instances with their lifecycle, and source and ownership information.
+- **One inventory:** Kubernetes collectors sit in the **Fleet** list with host collectors. Switch between All, Hosts and Kubernetes, with cluster and namespace filters.
+- **Workload detail** on one page: observed ConfigMap references, configuration hashes, optional configuration content (opt-in), pod instances with their lifecycle, and source and ownership information.
 - **Freshness:** stale or disconnected observations are shown as historical, not current.
-- **Instrumentation readiness** (**Instrumentation → Kubernetes**): OpenTelemetry coverage per cluster, the APM agent each application workload runs (OpenTelemetry or another vendor, detected read-only), one next step per workload, and the auto-instrumentation rollout state reported by the Kubernetes operator. Readiness needs operator 0.8.0, rollout state 0.9 and the `OTEL_*` settings table 0.9.1.
+- **Instrumentation readiness** (under **Instrumentation**, with the **Kubernetes** filter): OpenTelemetry coverage per cluster, the APM agent each application workload runs (OpenTelemetry or another vendor, detected read-only), one next step per workload, and the auto-instrumentation rollout state reported by the Kubernetes operator. Readiness needs operator 0.8.0, rollout state 0.9 and the `OTEL_*` settings table 0.9.1. With the operator released alongside v0.8.3-beta, every Java container in a pod is instrumented (each with its own service name), the container annotation takes a comma-separated list, and readiness changes reach the console as they happen.
+- **Topology:** Kubernetes collectors and instrumented workloads appear in the Topology view. Workload-to-collector links depend on the operator reporting each collector's Services.
 - **Safe by design:** observed workloads are read-only. Host policies, canaries, upgrades, taps and host-only actions skip them, and Copilot and MCP answers distinguish them from managed hosts.
 - The observer enrolls with its own credential. Pilot limits: no Secret-backed configs, native OpenTelemetry Operator resources or OpenShift DeploymentConfigs yet, and live-cluster validation on managed Kubernetes platforms is still in progress.
 
@@ -142,13 +145,17 @@ Governance is the Telemetry Governor in the web console, with the tabs **Sources
 
 ## Instrumentation (alpha)
 
-**Instrumentation** in the side menu is ZeroTouch instrumentation, with the tabs Applications, Agent versions and Kubernetes.
-
+**Instrumentation** in the side menu is ZeroTouch instrumentation, with the tabs **Overview**, **Applications** and **Agents**, and a switch between Everywhere, Hosts and Kubernetes.
 
 - **Application discovery** on managed hosts: runtime, framework and version of running applications. Off by default and controlled per host, with every toggle audited.
 - **Enable or remove** OpenTelemetry agents for **Java, .NET, Node.js and Python** from the UI, with an optional canary cohort. Services (Windows services, IIS app pools, systemd units) are marked "restart required" and pick up instrumentation on their next restart. A standalone process also picks the change up on its next restart; an immediate restart needs an explicit confirmation.
 - **Agent baselines and central catalog** manage instrumentation agent versions across the fleet, with group overrides and per-node pins.
 - **Safety:** nodes act only on their own discovery data, only `OTEL_*` variables are accepted, services are never restarted without consent, relaunched apps keep their original user, and agent assets are checksum-pinned.
+- **Environment limits** (since v0.8.3-beta): a user or token limited to one environment cannot instrument, remove, deliver agents, pin versions or reconcile on hosts in another, in the console or through MCP. Fleet-wide settings need access to all environments.
+- **Crash protection:** if a Linux service fails to start after being instrumented, the agent is removed at the next scan. The service is not restarted, and the console says why and what to do. If the agent cannot be removed, the console says so. **Remove** works while the crash lock is on. Not yet covered: a Windows service that fails at startup, and a standalone process that dies within seconds of a restart.
+- **First-time Instrument** delivers the agent automatically. A rejected agent delivery shows as failed.
+- **Known limit:** the check for another vendor's agent can report "clean" wrongly in some cases (unreadable process environment, Node and Python variables, Windows service accounts).
+- **macOS** support is labelled experimental in the console.
 - Verified end to end for Java, Node.js and Python. .NET support is partial and depends on the framework.
 
 ## Identity and access

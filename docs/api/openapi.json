@@ -279,6 +279,9 @@
                   "expires_in": {
                     "type": "string"
                   },
+                  "install_package_id": {
+                    "type": "string"
+                  },
                   "max_uses": {
                     "type": "integer"
                   },
@@ -2507,15 +2510,144 @@
         "x-permissions-any": []
       }
     },
+    "/api/build_cancel": {
+      "post": {
+        "description": "409 when no build is running.",
+        "operationId": "post_api_build_cancel",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Cancel the running custom collector build",
+        "tags": [
+          "packages"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "builder:create"
+        ]
+      }
+    },
     "/api/build_custom_collector": {
       "post": {
-        "description": "",
+        "description": "Validates the request, records it in the build history and starts an OCB build. Returns the build id and any version-skew warnings. 409 when another build is running.",
         "operationId": "post_api_build_custom_collector",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "type": "string"
+                "properties": {
+                  "arch": {
+                    "enum": [
+                      "amd64",
+                      "arm64"
+                    ],
+                    "type": "string"
+                  },
+                  "connectors": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "exporters": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "extensions": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "os": {
+                    "enum": [
+                      "linux",
+                      "windows",
+                      "darwin"
+                    ],
+                    "type": "string"
+                  },
+                  "outputName": {
+                    "description": "Distribution name shown in package pickers (letters, digits, . _ -)",
+                    "type": "string"
+                  },
+                  "packageVersion": {
+                    "description": "Distribution version label; defaults to version",
+                    "type": "string"
+                  },
+                  "processors": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "receivers": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "tags": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "target": {
+                    "enum": [
+                      "sidecar",
+                      "main"
+                    ],
+                    "type": "string"
+                  },
+                  "version": {
+                    "description": "OCB (builder) version, e.g. 0.164.0",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "version"
+                ],
+                "type": "object"
               }
             }
           },
@@ -2562,6 +2694,17 @@
       "get": {
         "description": "",
         "operationId": "get_api_build_status",
+        "parameters": [
+          {
+            "description": "logEnd of the previous response: only log output after this byte offset is returned",
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2587,7 +2730,211 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Check progress and build output logs of active custom collector compilation",
+        "summary": "Check progress and build output logs of the active (or last) custom collector compilation",
+        "tags": [
+          "packages"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "builder:view"
+        ]
+      }
+    },
+    "/api/builder/info": {
+      "get": {
+        "description": "Versions are listed through the server's Go module proxy and cached for an hour; offline servers report the built-in default.",
+        "operationId": "get_api_builder_info",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Report Go toolchain availability and the OCB versions the server can build with",
+        "tags": [
+          "packages"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "builder:view"
+        ]
+      }
+    },
+    "/api/builds": {
+      "get": {
+        "description": "Every OCB build with its status, components, target platform and the package it produced.",
+        "operationId": "get_api_builds",
+        "parameters": [
+          {
+            "description": "Maximum rows (default 200, max 1000)",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List custom collector build history, newest first",
+        "tags": [
+          "packages"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "builder:view"
+        ]
+      }
+    },
+    "/api/builds/delete": {
+      "post": {
+        "description": "",
+        "operationId": "post_api_builds_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Remove a custom build history entry (its package is not deleted)",
+        "tags": [
+          "packages"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "builder:delete"
+        ]
+      }
+    },
+    "/api/builds/detail": {
+      "get": {
+        "description": "",
+        "operationId": "get_api_builds_detail",
+        "parameters": [
+          {
+            "description": "Build id",
+            "in": "query",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read one custom build including its manifest and log tail",
         "tags": [
           "packages"
         ],
@@ -2722,7 +3069,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:configure",
+          "instrumentation:configure",
           "fleet:control"
         ]
       }
@@ -2773,7 +3120,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:view"
+          "instrumentation:view"
         ]
       }
     },
@@ -6071,7 +6418,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Enable or disable the sidecar collector and ZeroTouch app discovery on supervisors",
+        "summary": "Enable or disable the sidecar collector and app discovery on supervisors",
         "tags": [
           "supervisors"
         ],
@@ -7010,7 +7357,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:view"
+          "instrumentation:view"
         ]
       }
     },
@@ -7069,7 +7416,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:configure",
+          "instrumentation:configure",
           "fleet:control"
         ]
       }
@@ -7121,7 +7468,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:configure",
+          "instrumentation:configure",
           "fleet:control"
         ]
       },
@@ -7207,7 +7554,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:configure",
+          "instrumentation:configure",
           "fleet:control"
         ]
       }
@@ -7266,7 +7613,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:configure",
+          "instrumentation:configure",
           "fleet:control"
         ]
       },
@@ -7337,7 +7684,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:configure",
+          "instrumentation:configure",
           "fleet:control"
         ]
       }
@@ -7388,7 +7735,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:configure",
+          "instrumentation:configure",
           "fleet:control"
         ]
       }
@@ -7665,7 +8012,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:view"
+          "instrumentation:view"
         ]
       }
     },
@@ -7755,7 +8102,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:configure",
+          "instrumentation:configure",
           "fleet:control"
         ]
       }
@@ -7797,7 +8144,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:view"
+          "instrumentation:view"
         ]
       }
     },
@@ -7848,7 +8195,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:configure"
+          "instrumentation:configure"
         ]
       },
       "post": {
@@ -7900,7 +8247,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Hide an application from the ZeroTouch inventory",
+        "summary": "Hide an application from the Instrumentation list",
         "tags": [
           "discovery"
         ],
@@ -7908,7 +8255,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:configure"
+          "instrumentation:configure"
         ]
       }
     },
@@ -7999,7 +8346,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "ZeroTouch application instances with their processes",
+        "summary": "Application instances with their processes",
         "tags": [
           "discovery"
         ],
@@ -8007,7 +8354,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:view"
+          "instrumentation:view"
         ]
       }
     },
@@ -8040,7 +8387,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "ZeroTouch coverage summary, view counts and host discovery states",
+        "summary": "Instrumentation coverage summary, view counts and host discovery states",
         "tags": [
           "discovery"
         ],
@@ -8048,7 +8395,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:view"
+          "instrumentation:view"
         ]
       }
     },
@@ -8139,7 +8486,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "ZeroTouch applications grouped across hosts",
+        "summary": "Applications grouped across hosts",
         "tags": [
           "discovery"
         ],
@@ -8147,7 +8494,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:view"
+          "instrumentation:view"
         ]
       }
     },
@@ -8189,6 +8536,139 @@
         "x-auth": "bearer",
         "x-permissions-any": [
           "fleet:view"
+        ]
+      }
+    },
+    "/api/k8s/instrumentation-readiness": {
+      "get": {
+        "description": "One entry per operator cluster connection (operator v0.8 or later). Every application workload carries a stage on the guided path (resolve, review, identify, ready, otel, other_vendor, sdk), a next_step {action, title, detail, command, finding}, its vendors and languages, and per container the agents, findings with stable codes and severities, launcher variables reduced to agent-loading entries, and the verdict. Each container also lists its OTEL_* variables (otel_env: name, value, source, resolved, in_pod, redacted; credential-looking values redacted, Secret values never read) so the configured exporter, sampler, service name, resource attributes and propagators are readable in one place. Workloads that opted in to CollectorCtrl's Java auto-instrumentation (operator v0.9) also carry instrumentation {requested, profile, state: pending|canary|rolled-out|reverted|skipped, pods, reason}, and next_step actions include opt_in_canary, restart_rollout, promote_canary, fix_revert and fix_skip. stats (workloads, by_stage, coverage, rollout) cover every workload in the cluster; matched counts the workloads that pass the filters before limit/offset. Filters take comma lists for stage, verdict, code and rollout; q matches name, namespace or stack. view=compact omits launcher, request and vendor-variable detail. Inferred from Kubernetes objects only: Secrets are never read and image registries are contacted only when a profile allows it (registry_checked). Environment authorization uses the cluster connection's classified environment.",
+        "operationId": "get_api_k8s_instrumentation_readiness",
+        "parameters": [
+          {
+            "example": "prod-eu",
+            "in": "query",
+            "name": "cluster",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "example": "shop",
+            "in": "query",
+            "name": "namespace",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "example": "resolve,review",
+            "in": "query",
+            "name": "stage",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "example": "conflict",
+            "in": "query",
+            "name": "verdict",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "example": "multiple_vendors",
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "example": "canary,reverted",
+            "in": "query",
+            "name": "rollout",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "example": "checkout",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "example": "50",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "example": "0",
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "example": "compact",
+            "in": "query",
+            "name": "view",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read Kubernetes instrumentation readiness with the guided stage and next step per workload",
+        "tags": [
+          "instrumentation"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "instrumentation:view"
         ]
       }
     },
@@ -8299,7 +8779,7 @@
     },
     "/api/login": {
       "post": {
-        "description": "",
+        "description": "Returns the user profile and, for scripts, a session JWT in the `token` field to send as `Authorization: Bearer`. The web UI sends `X-CollectorCtrl-Session: cookie` instead and receives the JWT in an HttpOnly cookie plus a `collectorctrl_csrf` cookie whose value it echoes in `X-CSRF-Token` on mutating requests.",
         "operationId": "post_api_login",
         "requestBody": {
           "content": {
@@ -8339,13 +8819,52 @@
           }
         },
         "security": [],
-        "summary": "GET login",
+        "summary": "Sign in with a local username and password",
         "tags": [
           "login"
         ],
         "x-admin-only": false,
         "x-audience": "management",
         "x-auth": "public",
+        "x-permissions-any": []
+      }
+    },
+    "/api/logout": {
+      "post": {
+        "description": "Clears the HttpOnly session cookie and the CSRF cookie set by POST /api/login (with X-CollectorCtrl-Session: cookie) or the SSO callback. Cookie-authenticated requests must send the X-CSRF-Token header. Bearer tokens are stateless and are not revoked by this call.",
+        "operationId": "post_api_logout",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "End the browser session (expire the session and CSRF cookies)",
+        "tags": [
+          "me"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
         "x-permissions-any": []
       }
     },
@@ -8663,7 +9182,7 @@
         ]
       },
       "post": {
-        "description": "",
+        "description": "Built-in admin only. Controls autonomous execution (auto_approve), four-eyes approval (require_different_approver) and the MCP rate limits; these are security policy and cannot be delegated to editors.",
         "operationId": "post_api_mcp_settings",
         "requestBody": {
           "content": {
@@ -8731,12 +9250,10 @@
         "tags": [
           "ai"
         ],
-        "x-admin-only": false,
+        "x-admin-only": true,
         "x-audience": "management",
         "x-auth": "bearer",
-        "x-permissions-any": [
-          "mcp:view"
-        ]
+        "x-permissions-any": []
       }
     },
     "/api/me": {
@@ -9831,6 +10348,65 @@
         "x-auth": "bearer",
         "x-permissions-any": [
           "packages:view"
+        ]
+      }
+    },
+    "/api/packages/executable": {
+      "post": {
+        "description": "The name is a file name, or a path inside the archive when several files share that name. It is checked against the stored archive. An empty name clears it; supervisors then look for the file name of the executable they are configured with.",
+        "operationId": "post_api_packages_executable",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "executable": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Missing, invalid, expired or revoked credentials"
+          },
+          "403": {
+            "description": "Authenticated but not permitted; permission denials are audited"
+          },
+          "405": {
+            "description": "Method not allowed"
+          },
+          "default": {
+            "description": "Operation failed; the response body contains diagnostics"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Set which file inside a .tar.gz package is the collector executable",
+        "tags": [
+          "packages"
+        ],
+        "x-admin-only": false,
+        "x-audience": "management",
+        "x-auth": "bearer",
+        "x-permissions-any": [
+          "packages:upload"
         ]
       }
     },
@@ -14348,7 +14924,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:configure",
+          "instrumentation:configure",
           "fleet:configure"
         ]
       }
@@ -14422,6 +14998,9 @@
               "schema": {
                 "properties": {
                   "arch": {
+                    "type": "string"
+                  },
+                  "executable": {
                     "type": "string"
                   },
                   "file": {
@@ -14797,7 +15376,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:configure",
+          "instrumentation:configure",
           "fleet:control"
         ]
       }
@@ -14944,7 +15523,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:view"
+          "instrumentation:view"
         ]
       }
     },
@@ -15057,7 +15636,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:view"
+          "instrumentation:view"
         ]
       }
     },
@@ -15098,7 +15677,7 @@
         "x-audience": "management",
         "x-auth": "bearer",
         "x-permissions-any": [
-          "zerotouch:view"
+          "instrumentation:view"
         ]
       }
     }

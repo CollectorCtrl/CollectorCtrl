@@ -18,7 +18,7 @@ This guide installs the **CollectorCtrl Server**. To connect hosts afterwards, s
 
 ### Release files
 
-Download from the [latest release](https://github.com/CollectorCtrl/CollectorCtrl/releases). Replace `<version>` below with the release version, for example `0.8.0-beta`.
+Download from the [latest release](https://github.com/CollectorCtrl/CollectorCtrl/releases). Replace `<version>` below with the release version, for example `0.8.3-beta`.
 
 | Platform | Server | Supervisor (for managed hosts) |
 | :--- | :--- | :--- |
@@ -26,7 +26,7 @@ Download from the [latest release](https://github.com/CollectorCtrl/CollectorCtr
 | Linux | `collectorctrl-server_<version>_linux_<arch>.tar.gz`<br>`collectorctrl-server-postgres_<version>_linux_<arch>.tar.gz` | `collectorctrl-supervisor_<version>_linux_<arch>.tar.gz` |
 | macOS | `collectorctrl-server_<version>_darwin_<arch>.tar.gz`<br>`collectorctrl-server-postgres_<version>_darwin_<arch>.tar.gz` | `collectorctrl-supervisor_<version>_darwin_<arch>.tar.gz` |
 
-`<arch>` is `amd64` or `arm64`. Each file has a `.sig` next to it: [verify it](verifying-downloads.md) before installing. The Windows setup programs and the MSI are not Authenticode-signed. The v0.8.0-beta release notes describe supervisor `.deb` and `.rpm` packages, but the v0.8.0-beta release page does not list any.
+`<arch>` is `amd64` or `arm64`. Each file has a `.sig` next to it: [verify it](verifying-downloads.md) before installing. The Windows setup programs and the MSI are not Authenticode-signed. The v0.8.0-beta release notes describe supervisor `.deb` and `.rpm` packages, but neither the v0.8.0-beta nor the v0.8.3-beta release page lists any.
 
 > You rarely need to download the Supervisor by hand. **Add collector** in the UI generates a command that fetches and installs it for you.
 
@@ -73,7 +73,7 @@ docker run -d --name collectorctrl --restart unless-stopped \
   ghcr.io/collectorctrl/collectorctrl-server:latest
 ```
 
-- Image: `ghcr.io/collectorctrl/collectorctrl-server`. Since v0.6.4-beta, releases publish versioned tags such as `0.6.4-beta`, and `latest` moves only on releases. The images are signed with cosign and carry an SPDX SBOM.
+- Image: `ghcr.io/collectorctrl/collectorctrl-server`. The registry lists `latest`, `main` and one immutable `main-<commit>` tag per build. The v0.6.4-beta notes describe versioned tags such as `0.6.4-beta`, but none is listed in the registry as of 16 November 2026, and the v0.8.0-beta notes say `latest` was not moved for that release. To pin a version, use a `main-<commit>` tag or the image digest. The images are signed with cosign and carry an SPDX SBOM.
 - This command does not set production mode or an administrator password, so the first sign-in is `admin` / `admin` with a forced password change. See [First sign-in](#first-sign-in).
 - The standard image has no Go toolchain, so it cannot run Custom builds.
 - Runs as a non-root user (UID 1000).
